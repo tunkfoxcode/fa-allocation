@@ -1183,11 +1183,16 @@ def main():
                     # KRBlock3 = BY_BLOCK_ByType & "-TO-" & TO_Y_BLOCK_KR4 & "-FROM-" & TO_Y_BLOCK_KR6
                     # kr_block_3 = allocation_by_kr_item.by_block_by_type + "-TO-" + allocation_by_kr_item.to_y_block_kr4 + "-FROM-" + allocation_by_kr_item.to_y_block_kr6
 
+                    kr_block_3 = allocation_by_kr_item
+
                     
                     #Step140 Foreach MyToItem (N)
-                    # for my_to_item in my_to_items:
-                    #     count = 1
-                    #     #Step150 FilterBlock3 = Merge (FilterBlock1, MyToType, MyToItem)
+                    for my_to_item in my_to_items:
+                        filter_block_3 = my_to_item
+                        y_block_3 = {
+                            "kr_block_3": kr_block_3,
+                            "filter_block_3": filter_block_3
+                        }
 
                 count_flag = count_flag + 1
             
