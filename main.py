@@ -322,6 +322,127 @@ class AllocationByType:
 
 
 @dataclass
+class AllocationByKR:
+    """
+    Model class cho bảng AllocationByKR_NativeTable
+    Mapping các field từ BigQuery sang Python object
+    """
+    from_y_block_from_type: Optional[str] = None
+    to_y_block_to_type: Optional[str] = None
+    to_y_block_kr1: Optional[str] = None
+    to_y_block_kr2: Optional[str] = None
+    to_y_block_kr3: Optional[str] = None
+    to_y_block_kr4: Optional[str] = None
+    to_y_block_kr5: Optional[str] = None
+    to_y_block_kr6: Optional[str] = None
+    to_y_block_kr7: Optional[str] = None
+    to_y_block_kr8: Optional[int] = None
+    to_y_block_kr9: Optional[int] = None
+    to_y_block_cdt1: Optional[int] = None
+    to_y_block_cdt2: Optional[int] = None
+    to_y_block_cdt3: Optional[int] = None
+    to_y_block_cdt4: Optional[int] = None
+    to_y_block_pt1: Optional[int] = None
+    to_y_block_pt2: Optional[int] = None
+    to_y_block_duration: Optional[int] = None
+    to_y_block_pt1_prev: Optional[int] = None
+    to_y_block_pt2_prev: Optional[int] = None
+    to_y_block_duration_prev: Optional[int] = None
+    to_y_block_own_type: Optional[int] = None
+    to_y_block_ai_type: Optional[int] = None
+    to_y_block_cty1: Optional[int] = None
+    to_y_block_cty2: Optional[int] = None
+    to_y_block_os_type: Optional[int] = None
+    to_y_block_fu1: Optional[int] = None
+    to_y_block_fu2: Optional[int] = None
+    to_y_block_ch: Optional[int] = None
+    to_y_block_egt1: Optional[int] = None
+    to_y_block_egt2: Optional[int] = None
+    to_y_block_egt3: Optional[int] = None
+    to_y_block_egt4: Optional[int] = None
+    to_y_block_hr1: Optional[int] = None
+    to_y_block_hr2: Optional[int] = None
+    to_y_block_hr3: Optional[int] = None
+    to_y_block_sec: Optional[int] = None
+    to_y_block_mx: Optional[int] = None
+    to_y_block_dx: Optional[int] = None
+    to_y_block_ppc: Optional[int] = None
+    to_y_block_np: Optional[int] = None
+    to_y_block_le1: Optional[int] = None
+    to_y_block_le2: Optional[int] = None
+    to_y_block_unit: Optional[int] = None
+    by_block_by_type: Optional[str] = None
+    config_upload_at: Optional[int] = None
+    
+    @classmethod
+    def from_bigquery_row(cls, row) -> 'AllocationByKR':
+        """Factory method để tạo instance từ BigQuery Row"""
+        if hasattr(row, 'items'):
+            data = dict(row.items())
+        else:
+            data = row
+            
+        return cls(
+            from_y_block_from_type=data.get('FROM_Y_BLOCK_FromType'),
+            to_y_block_to_type=data.get('TO_Y_BLOCK_ToType'),
+            to_y_block_kr1=data.get('TO_Y_BLOCK_KR1'),
+            to_y_block_kr2=data.get('TO_Y_BLOCK_KR2'),
+            to_y_block_kr3=data.get('TO_Y_BLOCK_KR3'),
+            to_y_block_kr4=data.get('TO_Y_BLOCK_KR4'),
+            to_y_block_kr5=data.get('TO_Y_BLOCK_KR5'),
+            to_y_block_kr6=data.get('TO_Y_BLOCK_KR6'),
+            to_y_block_kr7=data.get('TO_Y_BLOCK_KR7'),
+            to_y_block_kr8=data.get('TO_Y_BLOCK_KR8'),
+            to_y_block_kr9=data.get('TO_Y_BLOCK_KR9'),
+            to_y_block_cdt1=data.get('TO_Y_BLOCK_CDT1'),
+            to_y_block_cdt2=data.get('TO_Y_BLOCK_CDT2'),
+            to_y_block_cdt3=data.get('TO_Y_BLOCK_CDT3'),
+            to_y_block_cdt4=data.get('TO_Y_BLOCK_CDT4'),
+            to_y_block_pt1=data.get('TO_Y_BLOCK_PT1'),
+            to_y_block_pt2=data.get('TO_Y_BLOCK_PT2'),
+            to_y_block_duration=data.get('TO_Y_BLOCK_Duration'),
+            to_y_block_pt1_prev=data.get('TO_Y_BLOCK_PT1_PREV'),
+            to_y_block_pt2_prev=data.get('TO_Y_BLOCK_PT2_PREV'),
+            to_y_block_duration_prev=data.get('TO_Y_BLOCK_Duration_PREV'),
+            to_y_block_own_type=data.get('TO_Y_BLOCK_OwnType'),
+            to_y_block_ai_type=data.get('TO_Y_BLOCK_AIType'),
+            to_y_block_cty1=data.get('TO_Y_BLOCK_CTY1'),
+            to_y_block_cty2=data.get('TO_Y_BLOCK_CTY2'),
+            to_y_block_os_type=data.get('TO_Y_BLOCK_OSType'),
+            to_y_block_fu1=data.get('TO_Y_BLOCK_FU1'),
+            to_y_block_fu2=data.get('TO_Y_BLOCK_FU2'),
+            to_y_block_ch=data.get('TO_Y_BLOCK_CH'),
+            to_y_block_egt1=data.get('TO_Y_BLOCK_EGT1'),
+            to_y_block_egt2=data.get('TO_Y_BLOCK_EGT2'),
+            to_y_block_egt3=data.get('TO_Y_BLOCK_EGT3'),
+            to_y_block_egt4=data.get('TO_Y_BLOCK_EGT4'),
+            to_y_block_hr1=data.get('TO_Y_BLOCK_HR1'),
+            to_y_block_hr2=data.get('TO_Y_BLOCK_HR2'),
+            to_y_block_hr3=data.get('TO_Y_BLOCK_HR3'),
+            to_y_block_sec=data.get('TO_Y_BLOCK_SEC'),
+            to_y_block_mx=data.get('TO_Y_BLOCK_MX'),
+            to_y_block_dx=data.get('TO_Y_BLOCK_DX'),
+            to_y_block_ppc=data.get('TO_Y_BLOCK_PPC'),
+            to_y_block_np=data.get('TO_Y_BLOCK_NP'),
+            to_y_block_le1=data.get('TO_Y_BLOCK_LE1'),
+            to_y_block_le2=data.get('TO_Y_BLOCK_LE2'),
+            to_y_block_unit=data.get('TO_Y_BLOCK_UNIT'),
+            by_block_by_type=data.get('BY_BLOCK_ByType'),
+            config_upload_at=data.get('Config_Upload_at')
+        )
+    
+    @classmethod
+    def from_dataframe(cls, df) -> List['AllocationByKR']:
+        """Factory method để tạo list instances từ pandas DataFrame"""
+        return [cls.from_bigquery_row(row) for _, row in df.iterrows()]
+    
+    def __repr__(self) -> str:
+        """String representation cho debugging"""
+        return (f"AllocationByKR(from_type='{self.from_y_block_from_type}', to_type='{self.to_y_block_to_type}', "
+                f"kr6='{self.to_y_block_kr6}', kr4='{self.to_y_block_kr4}', by_type='{self.by_block_by_type}')")
+
+
+@dataclass
 class SoCell:
     """
     Model class cho bảng so_cell_raw_full
@@ -437,7 +558,7 @@ class SoCell:
     by_block_bypercent: Optional[float] = None
     
     @classmethod
-    def from_bigquery_row(cls, row) -> 'SoCellRawFull':
+    def from_bigquery_row(cls, row) -> 'SoCell':
         """Factory method để tạo instance từ BigQuery Row"""
         if hasattr(row, 'items'):
             data = dict(row.items())
@@ -556,7 +677,7 @@ class SoCell:
         )
     
     @classmethod
-    def from_dataframe(cls, df) -> List['SoCellRawFull']:
+    def from_dataframe(cls, df) -> List['SoCell']:
         """Factory method để tạo list instances từ pandas DataFrame"""
         return [cls.from_bigquery_row(row) for _, row in df.iterrows()]
     
@@ -565,6 +686,242 @@ class SoCell:
         return (f"SoCellRawFull(fnf='{self.now_y_block_fnf_fnf}', "
                 f"kr1='{self.now_y_block_kr_item_code_kr1}', "
                 f"now_value={self.now_value}, by_type='{self.by_block_bytype}')")
+
+
+# YBLOCK Field Mapping: AllocationByType -> SoCell (NowYBlock)
+YBLOCK_FIELD_MAPPING = {
+    # KR fields
+    'to_y_block_kr1': 'now_y_block_kr_item_code_kr1',
+    'to_y_block_kr2': 'now_y_block_kr_item_code_kr2',
+    'to_y_block_kr3': 'now_y_block_kr_item_code_kr3',
+    'to_y_block_kr4': 'now_y_block_kr_item_code_kr4',
+    'to_y_block_kr5': 'now_y_block_kr_item_code_kr5',
+    'to_y_block_kr6': 'now_y_block_kr_item_code_kr6',
+    'to_y_block_kr7': 'now_y_block_kr_item_code_kr7',
+    'to_y_block_kr8': 'now_y_block_kr_item_code_kr8',
+    # CDT fields
+    'to_y_block_cdt1': 'now_y_block_cdt_cdt1',
+    'to_y_block_cdt2': 'now_y_block_cdt_cdt2',
+    'to_y_block_cdt3': 'now_y_block_cdt_cdt3',
+    'to_y_block_cdt4': 'now_y_block_cdt_cdt4',
+    # PT Now fields
+    'to_y_block_pt1': 'now_y_block_ptnow_pt1',
+    'to_y_block_pt2': 'now_y_block_ptnow_pt2',
+    'to_y_block_duration': 'now_y_block_ptnow_duration',
+    # PT Prev fields
+    'to_y_block_pt1_prev': 'now_y_block_ptprev_pt1',
+    'to_y_block_pt2_prev': 'now_y_block_ptprev_pt2',
+    'to_y_block_duration_prev': 'now_y_block_ptprev_duration',
+    # PT Fix fields
+    'to_y_block_own_type': 'now_y_block_ptfix_owntype',
+    'to_y_block_ai_type': 'now_y_block_ptfix_aitype',
+    # PT Sub fields
+    'to_y_block_cty1': 'now_y_block_ptsub_cty1',
+    'to_y_block_cty2': 'now_y_block_ptsub_cty2',
+    'to_y_block_os_type': 'now_y_block_ptsub_ostype',
+    # Funnel fields
+    'to_y_block_fu1': 'now_y_block_funnel_fu1',
+    'to_y_block_fu2': 'now_y_block_funnel_fu2',
+    # Channel field
+    'to_y_block_ch': 'now_y_block_channel_ch',
+    # Employee fields
+    'to_y_block_egt1': 'now_y_block_employee_egt1',
+    'to_y_block_egt2': 'now_y_block_employee_egt2',
+    'to_y_block_egt3': 'now_y_block_employee_egt3',
+    'to_y_block_egt4': 'now_y_block_employee_egt4',
+    # HR fields
+    'to_y_block_hr1': 'now_y_block_hr_hr1',
+    'to_y_block_hr2': 'now_y_block_hr_hr2',
+    'to_y_block_hr3': 'now_y_block_hr_hr3',
+    # SEC field
+    'to_y_block_sec': 'now_y_block_sec',
+    # Period fields
+    'to_y_block_mx': 'now_y_block_period_mx',
+    'to_y_block_dx': 'now_y_block_period_dx',
+    'to_y_block_ppc': 'now_y_block_period_ppc',
+    'to_y_block_np': 'now_y_block_period_np',
+    # LE fields
+    'to_y_block_le1': 'now_y_block_le_le1',
+    'to_y_block_le2': 'now_y_block_le_le2',
+    # Unit field
+    'to_y_block_unit': 'now_y_block_unit',
+}
+
+
+# YBLOCK Field Mapping: SoCell NowYBlock -> SoCell PrevYBlock
+PREV_YBLOCK_FIELD_MAPPING = {
+    # FNF field
+    'now_y_block_fnf_fnf': 'prev_y_block_fnf_fnf',
+    # KR fields
+    'now_y_block_kr_item_code_kr1': 'prev_y_block_kr_item_code_kr1',
+    'now_y_block_kr_item_code_kr2': 'prev_y_block_kr_item_code_kr2',
+    'now_y_block_kr_item_code_kr3': 'prev_y_block_kr_item_code_kr3',
+    'now_y_block_kr_item_code_kr4': 'prev_y_block_kr_item_code_kr4',
+    'now_y_block_kr_item_code_kr5': 'prev_y_block_kr_item_code_kr5',
+    'now_y_block_kr_item_code_kr6': 'prev_y_block_kr_item_code_kr6',
+    'now_y_block_kr_item_code_kr7': 'prev_y_block_kr_item_code_kr7',
+    'now_y_block_kr_item_code_kr8': 'prev_y_block_kr_item_code_kr8',
+    'now_y_block_kr_item_name': 'prev_y_block_kr_item_name',
+    # CDT fields
+    'now_y_block_cdt_cdt1': 'prev_y_block_cdt_cdt1',
+    'now_y_block_cdt_cdt2': 'prev_y_block_cdt_cdt2',
+    'now_y_block_cdt_cdt3': 'prev_y_block_cdt_cdt3',
+    'now_y_block_cdt_cdt4': 'prev_y_block_cdt_cdt4',
+    # PT Now fields
+    'now_y_block_ptnow_pt1': 'prev_y_block_ptnow_pt1',
+    'now_y_block_ptnow_pt2': 'prev_y_block_ptnow_pt2',
+    'now_y_block_ptnow_duration': 'prev_y_block_ptnow_duration',
+    # PT Prev fields
+    'now_y_block_ptprev_pt1': 'prev_y_block_ptprev_pt1',
+    'now_y_block_ptprev_pt2': 'prev_y_block_ptprev_pt2',
+    'now_y_block_ptprev_duration': 'prev_y_block_ptprev_duration',
+    # PT Fix fields
+    'now_y_block_ptfix_owntype': 'prev_y_block_ptfix_owntype',
+    'now_y_block_ptfix_aitype': 'prev_y_block_ptfix_aitype',
+    # PT Sub fields
+    'now_y_block_ptsub_cty1': 'prev_y_block_ptsub_cty1',
+    'now_y_block_ptsub_cty2': 'prev_y_block_ptsub_cty2',
+    'now_y_block_ptsub_ostype': 'prev_y_block_ptsub_ostype',
+    # Funnel fields
+    'now_y_block_funnel_fu1': 'prev_y_block_funnel_fu1',
+    'now_y_block_funnel_fu2': 'prev_y_block_funnel_fu2',
+    # Channel field
+    'now_y_block_channel_ch': 'prev_y_block_channel_ch',
+    # Employee fields
+    'now_y_block_employee_egt1': 'prev_y_block_employee_egt1',
+    'now_y_block_employee_egt2': 'prev_y_block_employee_egt2',
+    'now_y_block_employee_egt3': 'prev_y_block_employee_egt3',
+    'now_y_block_employee_egt4': 'prev_y_block_employee_egt4',
+    # HR fields
+    'now_y_block_hr_hr1': 'prev_y_block_hr_hr1',
+    'now_y_block_hr_hr2': 'prev_y_block_hr_hr2',
+    'now_y_block_hr_hr3': 'prev_y_block_hr_hr3',
+    # SEC field
+    'now_y_block_sec': 'prev_y_block_sec',
+    # Period fields
+    'now_y_block_period_mx': 'prev_y_block_period_mx',
+    'now_y_block_period_dx': 'prev_y_block_period_dx',
+    'now_y_block_period_ppc': 'prev_y_block_period_ppc',
+    'now_y_block_period_np': 'prev_y_block_period_np',
+    # LE fields
+    'now_y_block_le_le1': 'prev_y_block_le_le1',
+    'now_y_block_le_le2': 'prev_y_block_le_le2',
+    # Unit field
+    'now_y_block_unit': 'prev_y_block_unit',
+}
+
+
+def build_so_cell_query(allocation_by_type_item: AllocationByType, table_name: str = 'foxlearning.alloc_stage.so_cell_raw_full') -> str:
+    """
+    Build dynamic query cho SoCell dựa trên Y-block fields của AllocationByType
+    
+    Args:
+        allocation_by_type_item: Instance của AllocationByType
+        table_name: Tên bảng BigQuery
+        
+    Returns:
+        SQL query string với WHERE conditions động
+    """
+    import pandas as pd
+    
+    where_conditions = []
+    
+    # Duyệt qua mapping và build WHERE conditions
+    for by_type_field, so_cell_field in YBLOCK_FIELD_MAPPING.items():
+        # Lấy giá trị từ AllocationByType instance
+        value = getattr(allocation_by_type_item, by_type_field, None)
+        
+        # Skip nếu value là None, pandas NA, NaN, hoặc empty string
+        if value is None:
+            continue
+        if pd.isna(value):
+            continue
+        if isinstance(value, str) and value == '':
+            continue
+            
+        # Format value dựa trên type
+        if isinstance(value, str):
+            # Escape single quotes trong string
+            escaped_value = value.replace("'", "\\'")
+            formatted_value = f"'{escaped_value}'"
+        elif isinstance(value, (int, float)):
+            formatted_value = str(value)
+        else:
+            formatted_value = f"'{str(value)}'"
+        
+        where_conditions.append(f"{so_cell_field} = {formatted_value}")
+    
+    # Build query
+    query = f"SELECT * FROM `{table_name}`"
+    
+    if where_conditions:
+        query += "\nWHERE " + "\nAND ".join(where_conditions)
+    
+    return query
+
+
+def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, table_name: str = 'foxlearning.alloc_stage.so_cell_raw_full') -> str:
+    """
+    Build dynamic query cho SoCell dựa trên PrevYBlock matching với NowYBlock của y_block_1
+    
+    Args:
+        y_block_1: SoCell instance có NowYBlock cần match với PrevYBlock
+        x_period_1: XPeriod value (now_np)
+        z_number: ZNumber từ AllocationALT
+        table_name: Tên bảng BigQuery
+        
+    Returns:
+        SQL query string với WHERE conditions động
+    """
+    import pandas as pd
+    
+    where_conditions = []
+    
+    # Duyệt qua mapping và build WHERE conditions cho PrevYBlock
+    for now_field, prev_field in PREV_YBLOCK_FIELD_MAPPING.items():
+        # Lấy giá trị từ NowYBlock của y_block_1
+        value = getattr(y_block_1, now_field, None)
+        
+        # Skip nếu value là None, pandas NA, NaN, hoặc empty string
+        if value is None:
+            continue
+        if pd.isna(value):
+            continue
+        if isinstance(value, str) and value == '':
+            continue
+            
+        # Format value dựa trên type
+        if isinstance(value, str):
+            # Escape single quotes trong string
+            escaped_value = value.replace("'", "\\'")
+            formatted_value = f"'{escaped_value}'"
+        elif isinstance(value, (int, float)):
+            formatted_value = str(value)
+        else:
+            formatted_value = f"'{str(value)}'"
+        
+        # Add condition cho PrevYBlock field
+        where_conditions.append(f"{prev_field} = {formatted_value}")
+    
+    # Add XPeriod condition (now_np)
+    if x_period_1 is not None and not pd.isna(x_period_1):
+        if isinstance(x_period_1, str):
+            escaped_x_period = x_period_1.replace("'", "\\'")
+            where_conditions.append(f"now_np = '{escaped_x_period}'")
+        else:
+            where_conditions.append(f"now_np = {x_period_1}")
+    
+    # Add ZNumber condition (from z_block)
+    if z_number is not None:
+        where_conditions.append(f"now_zblock2_alt = '{z_number}'")
+    
+    # Build query
+    query = f"SELECT * FROM `{table_name}`"
+    
+    if where_conditions:
+        query += "\nWHERE " + "\nAND ".join(where_conditions)
+    
+    return query
 
 
 class BigQueryConnector:
@@ -723,38 +1080,95 @@ def main():
 
             #Step60 Foreach MyAllocationByTypeItem (YNumber DECREASING):
             for my_allocation_by_type_item in my_allocation_by_type_items:
+                if my_allocation_by_type_item.to_y_block_kr1 != 'GI':
+                    continue
                 if count_flag > 0:
                     continue
                 print(f"    {my_allocation_by_type_item}")
-                # Query SoCellRawFull với điều kiện cụ thể
-                print(f"\n  → Querying SoCellRawFull...")
-
+                
                 #Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
                 #Mapping each yblock from by_type to so_cell
-
-                query_so_cell = """
-                            SELECT * 
-                            FROM `foxlearning.alloc_stage.so_cell_raw_full` 
-                            WHERE now_y_block_fnf_fnf = "KRF"
-                            AND now_y_block_kr_item_code_kr1 = "GI"
-                            """
-
+                print(f"\n  → Building dynamic query for SoCell...")
+                
+                # Build query động dựa trên Y-block fields của AllocationByType
+                query_so_cell = build_so_cell_query(my_allocation_by_type_item)
+                
+                print(f"  → Generated query:\n{query_so_cell}\n")
+                
                 my_so_cell_raw = bq.execute_query(query_so_cell)
 
                 # Chuyển đổi sang list of SoCellRawFull objects
                 from_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
 
-                print(f"  → Tìm thấy {len(from_so_cell_items)} records trong SoCellRawFull (fnf=KRF, kr1=GI)")
-
                 #Step80 Foreach FromSOCelItem(N)
                 for from_so_cell_item in from_so_cell_items[0:3]:
                     print(f"    {from_so_cell_item}")
                     # Step90 (YBlock1, XPeriod1, Value1) = FromSOCelItem(NowYBlock, XPeriod, NowValue)
-                    now_value = from_so_cell_item.now_value
-                    print(f"    {now_value}")
+                    y_block_1 = from_so_cell_item
+                    x_period_1 = from_so_cell_item.now_np
+                    value_1 = from_so_cell_item.now_value
 
 
+                    # Step100 MyFromItem = GetItem (YBlock1, MyFromType)
+                    # Tam thoi skip Step100
+                    
+                    #Step110 Query from SOCell: 
+                    # (SOCellItem.PrevYBlock = YBlock1 
+                    # AND SOCellItem.XPeriod = XPeriod1 
+                    # AND SOCellItem.ZNumber = MyAllocationALTItem.ZNumber) (N)
+                    print(f"\nStep110    → Building query for SoCell with PrevYBlock matching...")
+                    
+                    # Build query động cho PrevYBlock
+                    query_so_cell_prev = build_so_cell_prev_query(
+                        y_block_1=y_block_1,
+                        x_period_1=x_period_1,
+                        z_number=allocation.z_number
+                    )
+                    
+                    print(f"Step110    → Generated PrevYBlock query:\n{query_so_cell_prev}\n")
+                    
+                    # Execute query
+                    so_cell_raw = bq.execute_query(query_so_cell_prev)
+                    so_cells = SoCell.from_dataframe(so_cell_raw)
+                    print(f"Step110   → Tìm thấy {len(so_cells)} ToSoCell records")
 
+                    #Step120 If (N = 0)
+                    if len(so_cells) > 0:
+                        continue
+                    
+                    #Step120 Start allocating
+                    # Query AllocationByKR: WHERE TO_Y_BLOCK_KR6 = MyFromType 
+                    # AND TO_Y_BLOCK_KR4 = MyToType 
+                    # AND BY_BLOCK_ByType = MyByType
+                    print(f"\nStep130   → Querying AllocationByKR...")
+                    
+                    my_from_type = allocation.from_type  # MyFromType
+                    my_to_type = allocation.to_type      # MyToType
+                    my_by_type = my_allocation_by_type_item.by_block_by_type  # MyByType
+                    
+                    query_allocation_by_kr = f"""
+                    SELECT * 
+                    FROM `foxlearning.allocation_config.AllocationByKR_NativeTable` 
+                    WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
+                    AND TO_Y_BLOCK_KR4 = '{my_to_type}'
+                    AND BY_BLOCK_ByType = '{my_by_type}'
+                    """
+                    
+                    print(f"Step130   → Query: FROM_TYPE={my_from_type}, TO_TYPE={my_to_type}, BY_TYPE={my_by_type}")
+                    
+                    allocation_by_kr_raw = bq.execute_query(query_allocation_by_kr)
+                    allocation_by_kr_items = AllocationByKR.from_dataframe(allocation_by_kr_raw)
+                    
+                    print(f"Step130   → Tìm thấy {len(allocation_by_kr_items)} AllocationByKR records")
+
+                    #Step140 Foreach MyToItem (N)
+                    for my_to_item in my_to_items:
+                        count = 1
+                        #Step150 FilterBlock3 = Merge (FilterBlock1, MyToType, MyToItem)
+
+
+                    
+                    
                 count_flag = count_flag + 1
             
         
