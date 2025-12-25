@@ -1004,17 +1004,20 @@ class BigQueryConnector:
 
 
 def main():
-    """
-    Ví dụ sử dụng BigQuery Connector
-    """
+    # Configuration
+    credentials_path = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"
+    project_id = "foxlearning"
     
-    # Cấu hình - Thay đổi các giá trị này theo thông tin của bạn
-    CREDENTIALS_PATH = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"  # Đường dẫn tới file JSON key
-    PROJECT_ID = "foxlearning"  # ID của Google Cloud Project
+    # Dataset names
+    allocation_config_dataset_name = "allocation_config"
+    alloc_data_dataset_name = "alloc_stage"
     
-    # Kiểm tra xem có sử dụng biến môi trường không
-    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS_PATH)
-    project_id = os.getenv("GCP_PROJECT_ID", PROJECT_ID)
+    # Table names
+    allocation_alt_table_name = "AllocationALT_NativeTable"
+    allocation_to_item_table_name = "AllocationToItem_NativeTable"
+    allocation_by_type_table_name = "AllocationByType_NativeTable"
+    allocation_by_kr_table_name = "AllocationByKR_NativeTable"
+    so_cell_table_name = "so_cell_raw_full"
     
     try:
         # Khởi tạo connector
@@ -1023,11 +1026,6 @@ def main():
             project_id=project_id
         )
         
-        # Ví dụ 1: Liệt kê datasets
-        print("\n=== LIỆT KÊ DATASETS ===")
-        bq.list_datasets()
-        
-        # Ví dụ 2: Query AllocationALT_NativeTable và mapping sang object
         #Step20 Query from AllocationALT: MyAllocationALTItem (N)
         print("\n=== QUERY ALLOCATION ALT ===")
         query = f"""
@@ -1037,21 +1035,18 @@ def main():
             TO_ALT_ToALT,
             FROM_Y_BLOCK_FromType,
             TO_Y_BLOCK_ToType
-        FROM `{project_id}.allocation_config.AllocationALT_NativeTable` 
+        FROM `{project_id}.{allocation_config_dataset_name}.{allocation_alt_table_name}` 
         ORDER BY ZNumber ASC
         """
-        
         df = bq.execute_query(query)
-        
-        # Chuyển đổi DataFrame sang list of AllocationALT objects
         my_allocation_alt_items = AllocationALT.from_dataframe(df)
 
         #Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
         for allocation in my_allocation_alt_items:
+            # TODO remove it to calculate all
             if allocation.z_number != 422:
                 continue
             print(f"  {allocation}")
-
             #Step35 Query from AllocationToItem: (MyFromType) -> MyFromItemAllowed (N) // PT0 -> "Null"; PT1 -> Game, Util, Productivity...
 
 
@@ -1060,7 +1055,7 @@ def main():
             # Query AllocationToItem dựa trên to_type của allocation
             query_to_item = f"""
             SELECT * 
-            FROM `{project_id}.allocation_config.AllocationToItem_NativeTable` 
+            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
             WHERE TO_Y_BLOCK_ToType = "{allocation.to_type}"
             """
             
@@ -1075,7 +1070,7 @@ def main():
             # Query AllocationByType dựa trên z_number của allocation
             query_by_type = f"""
             SELECT * 
-            FROM `{project_id}.allocation_config.AllocationByType_NativeTable` 
+            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_type_table_name}` 
             WHERE ZNumber = {allocation.z_number}
             ORDER BY YNumber DESC
             """
@@ -1086,6 +1081,8 @@ def main():
             my_allocation_by_type_items = AllocationByType.from_dataframe(my_by_type_raw)
             
             print(f"  → Tìm thấy {len(my_allocation_by_type_items)} records trong AllocationByType cho z_number={allocation.z_number}")
+
+            #TODO remove it to calculate all
             count_flag = 0
 
             #Step60 Foreach MyAllocationByTypeItem (YNumber DECREASING):
@@ -1101,7 +1098,12 @@ def main():
                 print(f"\n  → Building dynamic query for SoCell...")
                 
                 # Build query động dựa trên Y-block fields của AllocationByType
-                query_so_cell = build_so_cell_query(my_allocation_by_type_item, project_id)
+                query_so_cell = build_so_cell_query(
+                    my_allocation_by_type_item, 
+                    project_id, 
+                    dataset_id=alloc_data_dataset_name, 
+                    table_id=so_cell_table_name
+                )
                 
                 print(f"  → Generated query:\n{query_so_cell}\n")
                 
@@ -1133,7 +1135,9 @@ def main():
                         y_block_1=y_block_1,
                         x_period_1=x_period_1,
                         z_number=allocation.z_number,
-                        project_id=project_id
+                        project_id=project_id,
+                        dataset_id=alloc_data_dataset_name,
+                        table_id=so_cell_table_name
                     )
                     
                     print(f"Step110    → Generated PrevYBlock query:\n{query_so_cell_prev}\n")
@@ -1159,7 +1163,7 @@ def main():
                     
                     query_allocation_by_kr = f"""
                     SELECT * 
-                    FROM `{project_id}.allocation_config.AllocationByKR_NativeTable` 
+                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}` 
                     WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
                     AND TO_Y_BLOCK_KR4 = '{my_to_type}'
                     AND BY_BLOCK_ByType = '{my_by_type}'
@@ -1185,17 +1189,11 @@ def main():
                     #     count = 1
                     #     #Step150 FilterBlock3 = Merge (FilterBlock1, MyToType, MyToItem)
 
-
-
                 count_flag = count_flag + 1
             
         
     except Exception as e:
         print(f"Lỗi: {str(e)}")
-        print("\nVui lòng kiểm tra:")
-        print("1. File credentials JSON có tồn tại và đường dẫn đúng")
-        print("2. Project ID chính xác")
-        print("3. Service account có quyền truy cập BigQuery")
 
 
 if __name__ == '__main__':
