@@ -811,13 +811,15 @@ PREV_YBLOCK_FIELD_MAPPING = {
 }
 
 
-def build_so_cell_query(allocation_by_type_item: AllocationByType, table_name: str = 'foxlearning.alloc_stage.so_cell_raw_full') -> str:
+def build_so_cell_query(allocation_by_type_item: AllocationByType, project_id: str, dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
     """
     Build dynamic query cho SoCell dựa trên Y-block fields của AllocationByType
     
     Args:
         allocation_by_type_item: Instance của AllocationByType
-        table_name: Tên bảng BigQuery
+        project_id: Google Cloud Project ID
+        dataset_id: Dataset ID (default: 'alloc_stage')
+        table_id: Table ID (default: 'so_cell_raw_full')
         
     Returns:
         SQL query string với WHERE conditions động
@@ -852,6 +854,7 @@ def build_so_cell_query(allocation_by_type_item: AllocationByType, table_name: s
         where_conditions.append(f"{so_cell_field} = {formatted_value}")
     
     # Build query
+    table_name = f"{project_id}.{dataset_id}.{table_id}"
     query = f"SELECT * FROM `{table_name}`"
     
     if where_conditions:
@@ -860,7 +863,7 @@ def build_so_cell_query(allocation_by_type_item: AllocationByType, table_name: s
     return query
 
 
-def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, table_name: str = 'foxlearning.alloc_stage.so_cell_raw_full') -> str:
+def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, project_id: str, dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
     """
     Build dynamic query cho SoCell dựa trên PrevYBlock matching với NowYBlock của y_block_1
     
@@ -868,7 +871,9 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
         y_block_1: SoCell instance có NowYBlock cần match với PrevYBlock
         x_period_1: XPeriod value (now_np)
         z_number: ZNumber từ AllocationALT
-        table_name: Tên bảng BigQuery
+        project_id: Google Cloud Project ID
+        dataset_id: Dataset ID (default: 'alloc_stage')
+        table_id: Table ID (default: 'so_cell_raw_full')
         
     Returns:
         SQL query string với WHERE conditions động
@@ -916,6 +921,7 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
         where_conditions.append(f"now_zblock2_alt = '{z_number}'")
     
     # Build query
+    table_name = f"{project_id}.{dataset_id}.{table_id}"
     query = f"SELECT * FROM `{table_name}`"
     
     if where_conditions:
@@ -1024,14 +1030,14 @@ def main():
         # Ví dụ 2: Query AllocationALT_NativeTable và mapping sang object
         #Step20 Query from AllocationALT: MyAllocationALTItem (N)
         print("\n=== QUERY ALLOCATION ALT ===")
-        query = """
+        query = f"""
         SELECT
             ZNumber,
             FROM_ALT_FromALT,
             TO_ALT_ToALT,
             FROM_Y_BLOCK_FromType,
             TO_Y_BLOCK_ToType
-        FROM `foxlearning.allocation_config.AllocationALT_NativeTable` 
+        FROM `{project_id}.allocation_config.AllocationALT_NativeTable` 
         ORDER BY ZNumber ASC
         """
         
@@ -1046,11 +1052,15 @@ def main():
                 continue
             print(f"  {allocation}")
 
+            #Step35 Query from AllocationToItem: (MyFromType) -> MyFromItemAllowed (N) // PT0 -> "Null"; PT1 -> Game, Util, Productivity...
+
+
+
             #Step40 Query from AllocationToItem: (MyToType) -> MyToItem (N)
             # Query AllocationToItem dựa trên to_type của allocation
             query_to_item = f"""
             SELECT * 
-            FROM `foxlearning.allocation_config.AllocationToItem_NativeTable` 
+            FROM `{project_id}.allocation_config.AllocationToItem_NativeTable` 
             WHERE TO_Y_BLOCK_ToType = "{allocation.to_type}"
             """
             
@@ -1065,7 +1075,7 @@ def main():
             # Query AllocationByType dựa trên z_number của allocation
             query_by_type = f"""
             SELECT * 
-            FROM `foxlearning.allocation_config.AllocationByType_NativeTable` 
+            FROM `{project_id}.allocation_config.AllocationByType_NativeTable` 
             WHERE ZNumber = {allocation.z_number}
             ORDER BY YNumber DESC
             """
@@ -1091,7 +1101,7 @@ def main():
                 print(f"\n  → Building dynamic query for SoCell...")
                 
                 # Build query động dựa trên Y-block fields của AllocationByType
-                query_so_cell = build_so_cell_query(my_allocation_by_type_item)
+                query_so_cell = build_so_cell_query(my_allocation_by_type_item, project_id)
                 
                 print(f"  → Generated query:\n{query_so_cell}\n")
                 
@@ -1122,7 +1132,8 @@ def main():
                     query_so_cell_prev = build_so_cell_prev_query(
                         y_block_1=y_block_1,
                         x_period_1=x_period_1,
-                        z_number=allocation.z_number
+                        z_number=allocation.z_number,
+                        project_id=project_id
                     )
                     
                     print(f"Step110    → Generated PrevYBlock query:\n{query_so_cell_prev}\n")
@@ -1148,7 +1159,7 @@ def main():
                     
                     query_allocation_by_kr = f"""
                     SELECT * 
-                    FROM `foxlearning.allocation_config.AllocationByKR_NativeTable` 
+                    FROM `{project_id}.allocation_config.AllocationByKR_NativeTable` 
                     WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
                     AND TO_Y_BLOCK_KR4 = '{my_to_type}'
                     AND BY_BLOCK_ByType = '{my_by_type}'
@@ -1161,14 +1172,21 @@ def main():
                     
                     print(f"Step130   → Tìm thấy {len(allocation_by_kr_items)} AllocationByKR records")
 
+                    if len(allocation_by_kr_items) < 0:
+                        continue
+                    allocation_by_kr_item = allocation_by_kr_items[0]
+                    #Step130
+                    # KRBlock3 = BY_BLOCK_ByType & "-TO-" & TO_Y_BLOCK_KR4 & "-FROM-" & TO_Y_BLOCK_KR6
+                    # kr_block_3 = allocation_by_kr_item.by_block_by_type + "-TO-" + allocation_by_kr_item.to_y_block_kr4 + "-FROM-" + allocation_by_kr_item.to_y_block_kr6
+
+                    
                     #Step140 Foreach MyToItem (N)
-                    for my_to_item in my_to_items:
-                        count = 1
-                        #Step150 FilterBlock3 = Merge (FilterBlock1, MyToType, MyToItem)
+                    # for my_to_item in my_to_items:
+                    #     count = 1
+                    #     #Step150 FilterBlock3 = Merge (FilterBlock1, MyToType, MyToItem)
 
 
-                    
-                    
+
                 count_flag = count_flag + 1
             
         
