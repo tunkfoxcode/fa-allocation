@@ -1,10 +1,25 @@
-import os
+# ============================================================================
+# GOOGLE COLAB - FINANCE ALLOCATION BIGQUERY
+# ============================================================================
+# Để chạy trên Google Colab, không cần OAuth2 credentials file
+# Colab sẽ tự động authenticate với Google Cloud
+# ============================================================================
+
+# BLOCK 1: Import Libraries
+# ----------------------------------------------------------------------------
 from dataclasses import dataclass
 from typing import Optional, List
 from google.cloud import bigquery
-from google.oauth2 import service_account
+import pandas as pd
 
+# BLOCK 2: Authenticate với BigQuery (chỉ cần chạy 1 lần)
+# ----------------------------------------------------------------------------
+# Uncomment dòng dưới khi chạy trên Colab để authenticate
+# from google.colab import auth
+# auth.authenticate_user()
 
+# BLOCK 3: Model Classes - AllocationALT
+# ----------------------------------------------------------------------------
 @dataclass
 class AllocationALT:
     """
@@ -19,15 +34,7 @@ class AllocationALT:
     
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationALT':
-        """
-        Factory method để tạo instance từ BigQuery Row
-        
-        Args:
-            row: BigQuery Row object hoặc dictionary
-            
-        Returns:
-            AllocationALT instance
-        """
+        """Factory method để tạo instance từ BigQuery Row"""
         if hasattr(row, 'items'):
             data = dict(row.items())
         else:
@@ -43,15 +50,7 @@ class AllocationALT:
     
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationALT']:
-        """
-        Factory method để tạo list instances từ pandas DataFrame
-        
-        Args:
-            df: pandas DataFrame từ BigQuery query result
-            
-        Returns:
-            List of AllocationALT instances
-        """
+        """Factory method để tạo list instances từ pandas DataFrame"""
         return [
             cls(
                 z_number=row.get('ZNumber'),
@@ -70,6 +69,8 @@ class AllocationALT:
                 f"from_type='{self.from_type}', to_type='{self.to_type}')")
 
 
+# BLOCK 4: Model Classes - AllocationToItem
+# ----------------------------------------------------------------------------
 @dataclass
 class AllocationToItem:
     """
@@ -84,15 +85,7 @@ class AllocationToItem:
     
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationToItem':
-        """
-        Factory method để tạo instance từ BigQuery Row
-        
-        Args:
-            row: BigQuery Row object hoặc dictionary
-            
-        Returns:
-            AllocationToItem instance
-        """
+        """Factory method để tạo instance từ BigQuery Row"""
         if hasattr(row, 'items'):
             data = dict(row.items())
         else:
@@ -108,15 +101,7 @@ class AllocationToItem:
     
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationToItem']:
-        """
-        Factory method để tạo list instances từ pandas DataFrame
-        
-        Args:
-            df: pandas DataFrame từ BigQuery query result
-            
-        Returns:
-            List of AllocationToItem instances
-        """
+        """Factory method để tạo list instances từ pandas DataFrame"""
         return [
             cls(
                 from_type=row.get('FROM_Y_BLOCK_FromType'),
@@ -135,6 +120,8 @@ class AllocationToItem:
                 f"to_item='{self.to_item}', config_upload_at={self.config_upload_at})")
 
 
+# BLOCK 5: Model Classes - AllocationByType
+# ----------------------------------------------------------------------------
 @dataclass
 class AllocationByType:
     """
@@ -189,15 +176,7 @@ class AllocationByType:
     
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationByType':
-        """
-        Factory method để tạo instance từ BigQuery Row
-        
-        Args:
-            row: BigQuery Row object hoặc dictionary
-            
-        Returns:
-            AllocationByType instance
-        """
+        """Factory method để tạo instance từ BigQuery Row"""
         if hasattr(row, 'items'):
             data = dict(row.items())
         else:
@@ -253,15 +232,7 @@ class AllocationByType:
     
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationByType']:
-        """
-        Factory method để tạo list instances từ pandas DataFrame
-        
-        Args:
-            df: pandas DataFrame từ BigQuery query result
-            
-        Returns:
-            List of AllocationByType instances
-        """
+        """Factory method để tạo list instances từ pandas DataFrame"""
         return [
             cls(
                 z_number=row.get('ZNumber'),
@@ -321,8 +292,10 @@ class AllocationByType:
                 f"by_type='{self.by_block_by_type}', unit={self.to_y_block_unit})")
 
 
+# BLOCK 6: Model Classes - SoCellRawFull
+# ----------------------------------------------------------------------------
 @dataclass
-class SoCell:
+class SoCellRawFull:
     """
     Model class cho bảng so_cell_raw_full
     Mapping các field từ BigQuery sang Python object
@@ -567,204 +540,95 @@ class SoCell:
                 f"now_value={self.now_value}, by_type='{self.by_block_bytype}')")
 
 
-class BigQueryConnector:
-    def __init__(self, credentials_path=None, project_id=None):
-        """
-        Khởi tạo kết nối tới Google BigQuery
-        
-        Args:
-            credentials_path: Đường dẫn tới file JSON service account key
-            project_id: ID của Google Cloud Project
-        """
-        if credentials_path:
-            credentials = service_account.Credentials.from_service_account_file(
-                credentials_path,
-                scopes=["https://www.googleapis.com/auth/bigquery"]
-            )
-            self.client = bigquery.Client(credentials=credentials, project=project_id)
-        else:
-            self.client = bigquery.Client(project=project_id)
-        
-        print(f"✓ Đã kết nối thành công tới BigQuery project: {self.client.project}")
-    
-    def execute_query(self, query):
-        """
-        Thực thi query và trả về kết quả
-        
-        Args:
-            query: SQL query string
-            
-        Returns:
-            DataFrame chứa kết quả query
-        """
-        try:
-            print(f"Đang thực thi query...")
-            query_job = self.client.query(query)
-            results = query_job.result()
-            df = results.to_dataframe()
-            print(f"✓ Query thành công! Trả về {len(df)} dòng dữ liệu")
-            return df
-        except Exception as e:
-            print(f"✗ Lỗi khi thực thi query: {str(e)}")
-            raise
-    
-    def list_datasets(self):
-        """Liệt kê tất cả datasets trong project"""
-        datasets = list(self.client.list_datasets())
-        if datasets:
-            print(f"Datasets trong project {self.client.project}:")
-            for dataset in datasets:
-                print(f"  - {dataset.dataset_id}")
-        else:
-            print(f"Project {self.client.project} không có dataset nào")
-        return datasets
-    
-    def list_tables(self, dataset_id):
-        """Liệt kê tất cả tables trong một dataset"""
-        tables = list(self.client.list_tables(dataset_id))
-        if tables:
-            print(f"Tables trong dataset {dataset_id}:")
-            for table in tables:
-                print(f"  - {table.table_id}")
-        else:
-            print(f"Dataset {dataset_id} không có table nào")
-        return tables
-    
-    def get_table_schema(self, dataset_id, table_id):
-        """Lấy schema của một table"""
-        table_ref = f"{self.client.project}.{dataset_id}.{table_id}"
-        table = self.client.get_table(table_ref)
-        print(f"Schema của table {table_ref}:")
-        for field in table.schema:
-            print(f"  - {field.name}: {field.field_type}")
-        return table.schema
+# BLOCK 7: Khởi tạo BigQuery Client (cho Colab)
+# ----------------------------------------------------------------------------
+# Thay 'foxlearning' bằng project ID của bạn
+PROJECT_ID = 'foxlearning'
+client = bigquery.Client(project=PROJECT_ID)
+
+print(f"✓ Đã kết nối tới BigQuery project: {PROJECT_ID}")
 
 
-def main():
-    """
-    Ví dụ sử dụng BigQuery Connector
+# BLOCK 8: Query AllocationALT
+# ----------------------------------------------------------------------------
+query_allocation_alt = """
+SELECT
+    ZNumber,
+    FROM_ALT_FromALT,
+    TO_ALT_ToALT,
+    FROM_Y_BLOCK_FromType,
+    TO_Y_BLOCK_ToType
+FROM `foxlearning.allocation_config.AllocationALT_NativeTable` 
+ORDER BY ZNumber ASC
+"""
+
+print("\n=== QUERY ALLOCATION ALT ===")
+df_allocation_alt = client.query(query_allocation_alt).to_dataframe()
+my_allocation_alt_items = AllocationALT.from_dataframe(df_allocation_alt)
+print(f"✓ Tìm thấy {len(my_allocation_alt_items)} AllocationALT records")
+
+
+# BLOCK 9: Query AllocationToItem và AllocationByType
+# ----------------------------------------------------------------------------
+# Lọc allocation với z_number = 422
+for allocation in my_allocation_alt_items:
+    if allocation.z_number != 422:
+        continue
+    
+    print(f"\n{'='*70}")
+    print(f"Processing: {allocation}")
+    print(f"{'='*70}")
+    
+    # Query AllocationToItem
+    query_to_item = f"""
+    SELECT * 
+    FROM `foxlearning.allocation_config.AllocationToItem_NativeTable` 
+    WHERE TO_Y_BLOCK_ToType = "{allocation.to_type}"
     """
     
-    # Cấu hình - Thay đổi các giá trị này theo thông tin của bạn
-    CREDENTIALS_PATH = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"  # Đường dẫn tới file JSON key
-    PROJECT_ID = "foxlearning"  # ID của Google Cloud Project
+    df_to_item = client.query(query_to_item).to_dataframe()
+    my_to_items = AllocationToItem.from_dataframe(df_to_item)
+    print(f"\n→ Tìm thấy {len(my_to_items)} AllocationToItem records")
     
-    # Kiểm tra xem có sử dụng biến môi trường không
-    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", CREDENTIALS_PATH)
-    project_id = os.getenv("GCP_PROJECT_ID", PROJECT_ID)
+    # Query AllocationByType
+    query_by_type = f"""
+    SELECT * 
+    FROM `foxlearning.allocation_config.AllocationByType_NativeTable` 
+    WHERE ZNumber = {allocation.z_number}
+    ORDER BY YNumber DESC
+    """
     
-    try:
-        # Khởi tạo connector
-        bq = BigQueryConnector(
-            credentials_path=credentials_path,
-            project_id=project_id
-        )
-        
-        # Ví dụ 1: Liệt kê datasets
-        print("\n=== LIỆT KÊ DATASETS ===")
-        bq.list_datasets()
-        
-        # Ví dụ 2: Query AllocationALT_NativeTable và mapping sang object
-        #Step20 Query from AllocationALT: MyAllocationALTItem (N)
-        print("\n=== QUERY ALLOCATION ALT ===")
-        query = """
-        SELECT
-            ZNumber,
-            FROM_ALT_FromALT,
-            TO_ALT_ToALT,
-            FROM_Y_BLOCK_FromType,
-            TO_Y_BLOCK_ToType
-        FROM `foxlearning.allocation_config.AllocationALT_NativeTable` 
-        ORDER BY ZNumber ASC
-        """
-        
-        df = bq.execute_query(query)
-        
-        # Chuyển đổi DataFrame sang list of AllocationALT objects
-        my_allocation_alt_items = AllocationALT.from_dataframe(df)
-
-        #Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
-        for allocation in my_allocation_alt_items:
-            if allocation.z_number != 422:
-                continue
-            print(f"  {allocation}")
-
-            #Step40 Query from AllocationToItem: (MyToType) -> MyToItem (N)
-            # Query AllocationToItem dựa trên to_type của allocation
-            query_to_item = f"""
-            SELECT * 
-            FROM `foxlearning.allocation_config.AllocationToItem_NativeTable` 
-            WHERE TO_Y_BLOCK_ToType = "{allocation.to_type}"
-            """
-            
-            my_to_items_raw = bq.execute_query(query_to_item)
-            
-            # Chuyển đổi sang list of AllocationToItem objects
-            my_to_items = AllocationToItem.from_dataframe(my_to_items_raw)
-            
-            print(f"\n  → Tìm thấy {len(my_to_items)} items cho to_type='{allocation.to_type}'")
-
-            #Step50 Query from AllocationByType: (ZNumber) -> MyAllocationByTypeItem (YNumber, Y-Block, MyByType) (N)
-            # Query AllocationByType dựa trên z_number của allocation
-            query_by_type = f"""
-            SELECT * 
-            FROM `foxlearning.allocation_config.AllocationByType_NativeTable` 
-            WHERE ZNumber = {allocation.z_number}
-            ORDER BY YNumber DESC
-            """
-            
-            my_by_type_raw = bq.execute_query(query_by_type)
-            
-            # Chuyển đổi sang list of AllocationByType objects
-            my_allocation_by_type_items = AllocationByType.from_dataframe(my_by_type_raw)
-            
-            print(f"  → Tìm thấy {len(my_allocation_by_type_items)} records trong AllocationByType cho z_number={allocation.z_number}")
-            count_flag = 0
-
-            #Step60 Foreach MyAllocationByTypeItem (YNumber DECREASING):
-            for my_allocation_by_type_item in my_allocation_by_type_items:
-                if count_flag > 0:
-                    continue
-                print(f"    {my_allocation_by_type_item}")
-                # Query SoCellRawFull với điều kiện cụ thể
-                print(f"\n  → Querying SoCellRawFull...")
-
-                #Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
-                #Mapping each yblock from by_type to so_cell
-
-                query_so_cell = """
-                            SELECT * 
-                            FROM `foxlearning.alloc_stage.so_cell_raw_full` 
-                            WHERE now_y_block_fnf_fnf = "KRF"
-                            AND now_y_block_kr_item_code_kr1 = "GI"
-                            """
-
-                my_so_cell_raw = bq.execute_query(query_so_cell)
-
-                # Chuyển đổi sang list of SoCellRawFull objects
-                from_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
-
-                print(f"  → Tìm thấy {len(from_so_cell_items)} records trong SoCellRawFull (fnf=KRF, kr1=GI)")
-
-                #Step80 Foreach FromSOCelItem(N)
-                for from_so_cell_item in from_so_cell_items[0:3]:
-                    print(f"    {from_so_cell_item}")
-                    # Step90 (YBlock1, XPeriod1, Value1) = FromSOCelItem(NowYBlock, XPeriod, NowValue)
-                    now_value = from_so_cell_item.now_value
-                    print(f"    {now_value}")
+    df_by_type = client.query(query_by_type).to_dataframe()
+    my_allocation_by_type_items = AllocationByType.from_dataframe(df_by_type)
+    print(f"→ Tìm thấy {len(my_allocation_by_type_items)} AllocationByType records")
 
 
+# BLOCK 10: Query SoCellRawFull
+# ----------------------------------------------------------------------------
+# Lấy first AllocationByType item để demo
+count_flag = 0
+for my_allocation_by_type_item in my_allocation_by_type_items:
+    if count_flag > 0:
+        break
+    
+    print(f"\n→ Processing AllocationByType: {my_allocation_by_type_item}")
+    
+    # Query SoCellRawFull
+    query_so_cell = """
+    SELECT * 
+    FROM `foxlearning.alloc_stage.so_cell_raw_full` 
+    WHERE now_y_block_fnf_fnf = "KRF"
+    AND now_y_block_kr_item_code_kr1 = "GI"
+    """
+    
+    df_so_cell = client.query(query_so_cell).to_dataframe()
+    from_so_cell_items = SoCellRawFull.from_dataframe(df_so_cell)
+    
+    print(f"\n→ Tìm thấy {len(from_so_cell_items)} SoCellRawFull records")
+    print("\n→ Hiển thị 3 records đầu tiên:")
+    for from_so_cell_item in from_so_cell_items[:3]:
+        print(f"  {from_so_cell_item}")
+    
+    count_flag += 1
 
-                count_flag = count_flag + 1
-            
-        
-    except Exception as e:
-        print(f"Lỗi: {str(e)}")
-        print("\nVui lòng kiểm tra:")
-        print("1. File credentials JSON có tồn tại và đường dẫn đúng")
-        print("2. Project ID chính xác")
-        print("3. Service account có quyền truy cập BigQuery")
-
-
-if __name__ == '__main__':
-    main()
+print("\n✓ Hoàn thành!")
