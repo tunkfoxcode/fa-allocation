@@ -1,4 +1,5 @@
 import os
+import copy
 from dataclasses import dataclass
 from typing import Optional, List
 from google.cloud import bigquery
@@ -1026,6 +1027,167 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
     return query
 
 
+def create_socell_from_yblocks(
+    y_block_2: 'SoCell',
+    y_block_1: 'SoCell',
+    x_period_1: str,
+    value_2: float,
+    prev_ppc: str,
+    value_1: float,
+    by_type: str,
+    by_percent: float
+) -> 'SoCell':
+    return SoCell(
+        # NowYBlock = NowYBlock2
+        now_y_block_kr_item_code_kr1=y_block_2.now_y_block_kr_item_code_kr1,
+        now_y_block_kr_item_code_kr2=y_block_2.now_y_block_kr_item_code_kr2,
+        now_y_block_kr_item_code_kr3=y_block_2.now_y_block_kr_item_code_kr3,
+        now_y_block_kr_item_code_kr4=y_block_2.now_y_block_kr_item_code_kr4,
+        now_y_block_kr_item_code_kr5=y_block_2.now_y_block_kr_item_code_kr5,
+        now_y_block_kr_item_code_kr6=y_block_2.now_y_block_kr_item_code_kr6,
+        now_y_block_kr_item_code_kr7=y_block_2.now_y_block_kr_item_code_kr7,
+        now_y_block_kr_item_code_kr8=y_block_2.now_y_block_kr_item_code_kr8,
+        now_y_block_cdt_cdt1=y_block_2.now_y_block_cdt_cdt1,
+        now_y_block_cdt_cdt2=y_block_2.now_y_block_cdt_cdt2,
+        now_y_block_cdt_cdt3=y_block_2.now_y_block_cdt_cdt3,
+        now_y_block_cdt_cdt4=y_block_2.now_y_block_cdt_cdt4,
+        now_y_block_ptnow_pt1=y_block_2.now_y_block_ptnow_pt1,
+        now_y_block_ptnow_pt2=y_block_2.now_y_block_ptnow_pt2,
+        now_y_block_ptnow_duration=y_block_2.now_y_block_ptnow_duration,
+        now_y_block_ptprev_pt1=y_block_2.now_y_block_ptprev_pt1,
+        now_y_block_ptprev_pt2=y_block_2.now_y_block_ptprev_pt2,
+        now_y_block_ptprev_duration=y_block_2.now_y_block_ptprev_duration,
+        now_y_block_ptfix_owntype=y_block_2.now_y_block_ptfix_owntype,
+        now_y_block_ptfix_aitype=y_block_2.now_y_block_ptfix_aitype,
+        now_y_block_ptsub_cty1=y_block_2.now_y_block_ptsub_cty1,
+        now_y_block_ptsub_cty2=y_block_2.now_y_block_ptsub_cty2,
+        now_y_block_ptsub_ostype=y_block_2.now_y_block_ptsub_ostype,
+        now_y_block_funnel_fu1=y_block_2.now_y_block_funnel_fu1,
+        now_y_block_funnel_fu2=y_block_2.now_y_block_funnel_fu2,
+        now_y_block_channel_ch=y_block_2.now_y_block_channel_ch,
+        now_y_block_employee_egt1=y_block_2.now_y_block_employee_egt1,
+        now_y_block_employee_egt2=y_block_2.now_y_block_employee_egt2,
+        now_y_block_employee_egt3=y_block_2.now_y_block_employee_egt3,
+        now_y_block_employee_egt4=y_block_2.now_y_block_employee_egt4,
+        now_y_block_hr_hr1=y_block_2.now_y_block_hr_hr1,
+        now_y_block_hr_hr2=y_block_2.now_y_block_hr_hr2,
+        now_y_block_hr_hr3=y_block_2.now_y_block_hr_hr3,
+        now_y_block_sec=y_block_2.now_y_block_sec,
+        now_y_block_period_mx=y_block_2.now_y_block_period_mx,
+        now_y_block_period_dx=y_block_2.now_y_block_period_dx,
+        now_y_block_period_ppc=y_block_2.now_y_block_period_ppc,
+        now_y_block_period_np=y_block_2.now_y_block_period_np,
+        now_y_block_le_le1=y_block_2.now_y_block_le_le1,
+        now_y_block_le_le2=y_block_2.now_y_block_le_le2,
+        now_y_block_unit=y_block_2.now_y_block_unit,
+
+        # NowXPeriod=x_period_1
+        now_np=x_period_1,
+
+        #NowValue = NowValue2
+        now_value=value_2,
+        
+        # PrevYBlock = NowYBlock1
+        prev_y_block_kr_item_code_kr1=y_block_1.now_y_block_kr_item_code_kr1,
+        prev_y_block_kr_item_code_kr2=y_block_1.now_y_block_kr_item_code_kr2,
+        prev_y_block_kr_item_code_kr3=y_block_1.now_y_block_kr_item_code_kr3,
+        prev_y_block_kr_item_code_kr4=y_block_1.now_y_block_kr_item_code_kr4,
+        prev_y_block_kr_item_code_kr5=y_block_1.now_y_block_kr_item_code_kr5,
+        prev_y_block_kr_item_code_kr6=y_block_1.now_y_block_kr_item_code_kr6,
+        prev_y_block_kr_item_code_kr7=y_block_1.now_y_block_kr_item_code_kr7,
+        prev_y_block_kr_item_code_kr8=y_block_1.now_y_block_kr_item_code_kr8,
+        prev_y_block_cdt_cdt1=y_block_1.now_y_block_cdt_cdt1,
+        prev_y_block_cdt_cdt2=y_block_1.now_y_block_cdt_cdt2,
+        prev_y_block_cdt_cdt3=y_block_1.now_y_block_cdt_cdt3,
+        prev_y_block_cdt_cdt4=y_block_1.now_y_block_cdt_cdt4,
+        prev_y_block_ptnow_pt1=y_block_1.now_y_block_ptnow_pt1,
+        prev_y_block_ptnow_pt2=y_block_1.now_y_block_ptnow_pt2,
+        prev_y_block_ptnow_duration=y_block_1.now_y_block_ptnow_duration,
+        prev_y_block_ptprev_pt1=y_block_1.now_y_block_ptprev_pt1,
+        prev_y_block_ptprev_pt2=y_block_1.now_y_block_ptprev_pt2,
+        prev_y_block_ptprev_duration=y_block_1.now_y_block_ptprev_duration,
+        prev_y_block_ptfix_owntype=y_block_1.now_y_block_ptfix_owntype,
+        prev_y_block_ptfix_aitype=y_block_1.now_y_block_ptfix_aitype,
+        prev_y_block_ptsub_cty1=y_block_1.now_y_block_ptsub_cty1,
+        prev_y_block_ptsub_cty2=y_block_1.now_y_block_ptsub_cty2,
+        prev_y_block_ptsub_ostype=y_block_1.now_y_block_ptsub_ostype,
+        prev_y_block_funnel_fu1=y_block_1.now_y_block_funnel_fu1,
+        prev_y_block_funnel_fu2=y_block_1.now_y_block_funnel_fu2,
+        prev_y_block_channel_ch=y_block_1.now_y_block_channel_ch,
+        prev_y_block_employee_egt1=y_block_1.now_y_block_employee_egt1,
+        prev_y_block_employee_egt2=y_block_1.now_y_block_employee_egt2,
+        prev_y_block_employee_egt3=y_block_1.now_y_block_employee_egt3,
+        prev_y_block_employee_egt4=y_block_1.now_y_block_employee_egt4,
+        prev_y_block_hr_hr1=y_block_1.now_y_block_hr_hr1,
+        prev_y_block_hr_hr2=y_block_1.now_y_block_hr_hr2,
+        prev_y_block_hr_hr3=y_block_1.now_y_block_hr_hr3,
+        prev_y_block_sec=y_block_1.now_y_block_sec,
+        prev_y_block_period_mx=y_block_1.now_y_block_period_mx,
+        prev_y_block_period_dx=y_block_1.now_y_block_period_dx,
+        # prev_y_block_period_np=y_block_1.now_y_block_period_np,
+        prev_y_block_le_le1=y_block_1.now_y_block_le_le1,
+        prev_y_block_le_le2=y_block_1.now_y_block_le_le2,
+        prev_y_block_unit=y_block_1.now_y_block_unit,
+
+        # PrevXPeriod=x_period_1)
+        prev_y_block_period_np=x_period_1,
+
+        # PrevValue=NowValue1
+        prev_value=value_1,
+
+        
+        # ByType = ByType
+        by_block_bytype=by_type,
+
+        #ByPercent
+        by_block_bypercent=by_percent
+    )
+
+
+def add_period_strings(base_period: str, offset_period: str) -> str:
+    """
+    Cộng 2 chuỗi thời gian lại với nhau.
+    
+    Args:
+        base_period: Chuỗi dạng "M2907" (tháng 7 năm 2029)
+        offset_period: Chuỗi dạng "MP04" (plus 4 tháng)
+    
+    Returns:
+        Chuỗi kết quả dạng "M2911" (tháng 11 năm 2029)
+    
+    Example:
+        >>> add_period_strings("M2907", "MP04")
+        "M2911"
+        >>> add_period_strings("M2512", "MP01")
+        "M2601"
+    """
+    # Parse base_period: M2907 -> year=2029, month=7
+    if not base_period or len(base_period) < 5 or base_period[0] != 'M':
+        raise ValueError(f"Invalid base_period format: {base_period}. Expected format: M2907")
+    
+    year_str = base_period[1:3]  # "29"
+    month_str = base_period[3:5]  # "07"
+    base_year = 2000 + int(year_str)  # 2029
+    base_month = int(month_str)  # 7
+    
+    # Parse offset_period: MP04 -> offset=4
+    if not offset_period or len(offset_period) < 4 or not offset_period.startswith('MP'):
+        raise ValueError(f"Invalid offset_period format: {offset_period}. Expected format: MP04")
+    
+    offset_months = int(offset_period[2:])  # 4
+    
+    # Calculate new month and year
+    total_months = base_month + offset_months
+    new_year = base_year + (total_months - 1) // 12
+    new_month = ((total_months - 1) % 12) + 1
+    
+    # Format result: M2911
+    year_suffix = str(new_year)[-2:]  # "29" or "30"
+    result = f"M{year_suffix}{new_month:02d}"
+    
+    return result
+
+
 class BigQueryConnector:
     def __init__(self, credentials_path=None, project_id=None):
         """
@@ -1057,14 +1219,12 @@ class BigQueryConnector:
             DataFrame chứa kết quả query
         """
         try:
-            print(f"Đang thực thi query...")
             query_job = self.client.query(query)
             results = query_job.result()
             df = results.to_dataframe()
-            print(f"✓ Query thành công! Trả về {len(df)} dòng dữ liệu")
             return df
         except Exception as e:
-            print(f"✗ Lỗi khi thực thi query: {str(e)}")
+            print(f"✗ Error when executing query: {str(e)}")
             raise
     
     def list_datasets(self):
@@ -1123,7 +1283,6 @@ def main():
         )
         
         #Step20 Query from AllocationALT: MyAllocationALTItem (N)
-        print("\n=== QUERY ALLOCATION ALT ===")
         query = f"""
         SELECT
             ZNumber,
@@ -1137,37 +1296,34 @@ def main():
         df = bq.execute_query(query)
         my_allocation_alt_items = AllocationALT.from_dataframe(df)
 
+        print(f"[INFO][Step 20] We having {len(my_allocation_alt_items)} my_allocation_alt_items by query: \n {query}")
+
         #Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
-        for allocation in my_allocation_alt_items:
+        for my_allocation_alt_item in my_allocation_alt_items:
             # TODO remove it to calculate all
-            if allocation.z_number != 422:
+            if my_allocation_alt_item.z_number != 422:
+                print(f"[WARN][Step 30] Skip process my_allocation_alt_item: {my_allocation_alt_item} because z_number is not equal 422 for testing purpose, remove it when calculating in production mode")
                 continue
-            print(f"  {allocation}")
+            print(f"[INFO][Step 30] Start process each my_allocation_alt_item: {my_allocation_alt_item}")
             #Step35 Query from AllocationToItem: (MyFromType) -> MyFromItemAllowed (N) // PT0 -> "Null"; PT1 -> Game, Util, Productivity...
-
-
-
             #Step40 Query from AllocationToItem: (MyToType) -> MyToItem (N)
             # Query AllocationToItem dựa trên to_type của allocation
             query_to_item = f"""
             SELECT * 
             FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
-            WHERE TO_Y_BLOCK_ToType = "{allocation.to_type}"
+            WHERE TO_Y_BLOCK_ToType = "{my_allocation_alt_item.to_type}"
             """
-            
             my_to_items_raw = bq.execute_query(query_to_item)
-            
-            # Chuyển đổi sang list of AllocationToItem objects
             my_to_items = AllocationToItem.from_dataframe(my_to_items_raw)
-            
-            print(f"\n  → Tìm thấy {len(my_to_items)} items cho to_type='{allocation.to_type}'")
+
+            print(f"[INFO][Step 40] We having {len(my_to_items)} my_to_items by query: \n {query_to_item}")
 
             #Step50 Query from AllocationByType: (ZNumber) -> MyAllocationByTypeItem (YNumber, Y-Block, MyByType) (N)
             # Query AllocationByType dựa trên z_number của allocation
             query_by_type = f"""
             SELECT * 
             FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_type_table_name}` 
-            WHERE ZNumber = {allocation.z_number}
+            WHERE ZNumber = {my_allocation_alt_item.z_number}
             ORDER BY YNumber DESC
             """
             
@@ -1176,7 +1332,7 @@ def main():
             # Chuyển đổi sang list of AllocationByType objects
             my_allocation_by_type_items = AllocationByType.from_dataframe(my_by_type_raw)
             
-            print(f"  → Tìm thấy {len(my_allocation_by_type_items)} records trong AllocationByType cho z_number={allocation.z_number}")
+            print(f"[INFO][Step 50] We having {len(my_allocation_by_type_items)} my_allocation_by_type_items by query: \n {query_by_type}")
 
             #TODO remove it to calculate all
             count_flag = 0
@@ -1186,75 +1342,64 @@ def main():
                 if my_allocation_by_type_item.to_y_block_kr1 != 'GI':
                     continue
                 if count_flag > 0:
+                    print(f"[WARNING][Step 60] Only process for first my_allocation_by_type_item having to_y_block_kr1 = 'GI', need to remove this logic when calculating for production mode")
                     continue
-                print(f"    {my_allocation_by_type_item}")
+                print(f"[INFO][Step 60] Processing for each my_allocation_by_type_item: {my_allocation_by_type_item}")
                 
                 #Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
                 #Mapping each yblock from by_type to so_cell
-                print(f"\n  → Building dynamic query for SoCell...")
-                
-                # Build query động dựa trên Y-block fields của AllocationByType
+                #Build dynamic query base on the Y-block fields of my_allocation_by_type_item
                 query_so_cell = build_so_cell_query(
                     my_allocation_by_type_item, 
                     project_id, 
                     dataset_id=alloc_data_dataset_name, 
                     table_id=so_cell_table_name
                 )
-                
-                print(f"  → Generated query:\n{query_so_cell}\n")
-                
                 my_so_cell_raw = bq.execute_query(query_so_cell)
 
                 # Chuyển đổi sang list of SoCellRawFull objects
                 from_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
+                print(f"[INFO][Step 70] We having {len(from_so_cell_items)} from_so_cell_items by query: \n {query_so_cell}")
 
                 #Step80 Foreach FromSOCelItem(N)
-                for from_so_cell_item in from_so_cell_items[0:3]:
-                    print(f"    {from_so_cell_item}")
+                for from_so_cell_item in from_so_cell_items[0:1]:
                     # Step90 (YBlock1, XPeriod1, Value1) = FromSOCelItem(NowYBlock, XPeriod, NowValue)
+                    print(f"[INFO][Step 80] Start processing for each from_so_cell_item: {from_so_cell_item}")
                     y_block_1 = from_so_cell_item
                     x_period_1 = from_so_cell_item.now_np
                     value_1 = from_so_cell_item.now_value
-
-
+                    print(f"[INFO][Step 80] We have y_block_1: {y_block_1}, x_period_1: {x_period_1}, value_1: {value_1}")
                     # Step100 MyFromItem = GetItem (YBlock1, MyFromType)
                     # Tam thoi skip Step100
-                    
                     #Step110 Query from SOCell: 
                     # (SOCellItem.PrevYBlock = YBlock1 
                     # AND SOCellItem.XPeriod = XPeriod1 
                     # AND SOCellItem.ZNumber = MyAllocationALTItem.ZNumber) (N)
-                    print(f"\nStep110    → Building query for SoCell with PrevYBlock matching...")
-                    
                     # Build query động cho PrevYBlock
                     query_so_cell_prev = build_so_cell_prev_query(
                         y_block_1=y_block_1,
                         x_period_1=x_period_1,
-                        z_number=allocation.z_number,
+                        z_number=my_allocation_alt_item.z_number,
                         project_id=project_id,
                         dataset_id=alloc_data_dataset_name,
                         table_id=so_cell_table_name
                     )
-                    
-                    print(f"Step110    → Generated PrevYBlock query:\n{query_so_cell_prev}\n")
-                    
                     # Execute query
                     so_cell_raw = bq.execute_query(query_so_cell_prev)
-                    so_cells = SoCell.from_dataframe(so_cell_raw)
-                    print(f"Step110   → Tìm thấy {len(so_cells)} ToSoCell records")
+                    so_cells_prev_y_block = SoCell.from_dataframe(so_cell_raw)
+                    print(f"[INFO][Step 110] We having {len(so_cells_prev_y_block)} so_cells_prev_y_block by query: \n {query_so_cell_prev}")
 
                     #Step120 If (N = 0)
-                    if len(so_cells) > 0:
+                    if len(so_cells_prev_y_block) > 0:
+                        print("[WARN][Step 120] Skip process because so_cells_prev_y_block is empty (N=0)")
                         continue
                     
                     #Step120 Start allocating
                     # Query AllocationByKR: WHERE TO_Y_BLOCK_KR6 = MyFromType 
                     # AND TO_Y_BLOCK_KR4 = MyToType 
                     # AND BY_BLOCK_ByType = MyByType
-                    print(f"\nStep130   → Querying AllocationByKR...")
-                    
-                    my_from_type = allocation.from_type  # MyFromType
-                    my_to_type = allocation.to_type      # MyToType
+                    my_from_type = my_allocation_alt_item.from_type  # MyFromType
+                    my_to_type = my_allocation_alt_item.to_type      # MyToType
                     my_by_type = my_allocation_by_type_item.by_block_by_type  # MyByType
                     
                     query_allocation_by_kr = f"""
@@ -1264,50 +1409,78 @@ def main():
                     AND TO_Y_BLOCK_KR4 = '{my_to_type}'
                     AND BY_BLOCK_ByType = '{my_by_type}'
                     """
-                    
-                    print(f"Step130   → Query: FROM_TYPE={my_from_type}, TO_TYPE={my_to_type}, BY_TYPE={my_by_type}")
-                    
                     allocation_by_kr_raw = bq.execute_query(query_allocation_by_kr)
                     allocation_by_kr_items = AllocationByKR.from_dataframe(allocation_by_kr_raw)
                     
-                    print(f"Step130   → Tìm thấy {len(allocation_by_kr_items)} AllocationByKR records")
+                    print(f"[INFO] We having {len(allocation_by_kr_items)} allocation_by_kr_items by query: \n {query_allocation_by_kr}")
 
                     if len(allocation_by_kr_items) < 0:
+                        print("[WARN] Skip process because allocation_by_kr_items is empty")
                         continue
                     allocation_by_kr_item = allocation_by_kr_items[0]
+                    print(f"[INFO] We have allocation_by_kr_item by picking the first element of allocation_by_kr_items: {allocation_by_kr_item}")
                     #Step130
                     # KRBlock3 = BY_BLOCK_ByType & "-TO-" & TO_Y_BLOCK_KR4 & "-FROM-" & TO_Y_BLOCK_KR6
                     # kr_block_3 = allocation_by_kr_item.by_block_by_type + "-TO-" + allocation_by_kr_item.to_y_block_kr4 + "-FROM-" + allocation_by_kr_item.to_y_block_kr6
-
                     kr_block_3 = allocation_by_kr_item
-
-                    
                     #Step140 Foreach MyToItem (N)
                     for my_to_item in my_to_items:
+                        print(f"[INFO] Start processing for each my_to_item: {my_to_item}")
+                        
+                        #Step150 FilterBlock3 = MyToItem Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
                         filter_block_3 = my_to_item
-                        
-                        #Step150 Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
-                        print(f"\nStep170   → Building query for SoCell based on kr_block_3 + filter_block_3...")
-                        
-                        # Build query động từ AllocationByKR và AllocationToItem
-                        query_so_cell_by_kr = build_so_cell_by_kr_query(
+                        #Step170 Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
+                        by_percent_query = build_so_cell_by_kr_query(
                             allocation_by_kr_item=kr_block_3,
                             allocation_to_item=filter_block_3,
                             project_id=project_id,
                             dataset_id=alloc_data_dataset_name,
                             table_id=so_cell_table_name
                         )
-                        
-                        print(f"Step170   → Generated query:\n{query_so_cell_by_kr}\n")
-                        
                         # Execute query
-                        so_cell_by_kr_raw = bq.execute_query(query_so_cell_by_kr)
-                        so_cell_by_kr_items = SoCell.from_dataframe(so_cell_by_kr_raw)
-                        
-                        print(f"Step170   → Tìm thấy {len(so_cell_by_kr_items)} SoCell records matching y_block_3")
-                        for so_cell_by_kr_item in so_cell_by_kr_items[:3]:
-                            print(f"          {so_cell_by_kr_item}")
+                        by_percent_result_raw = bq.execute_query(by_percent_query)
+                        by_percent_items = SoCell.from_dataframe(by_percent_result_raw)
+                        print(f"[INFO][Step 170] We having {len(by_percent_items)} by_percent by query: \n {by_percent_query}")
+                        if len(by_percent_items) < 0:
+                            print("[WARN][Step 170] Skip process because by_percent_items is empty")
+                            continue
+                        by_percent = by_percent_items[0].now_value
+                        print(f"[INFO][Step 170] We have by_percent: \n {by_percent} \n by kr_block_3: {kr_block_3} and filter_block_3: {filter_block_3}")
+                        #Step180 Value2 = Value1 * ByPercent
+                        value_2 = value_1 * by_percent
+                        #Step190 IF MyFromType = NP
+                        if my_from_type == 'NP':
+                            #Step200 MyToTypeFinal = NP
+                            my_to_type_final = 'NP'
+                            #Step210 MyToItemFinal = x_period_1 + MyToItem , example M2601 = M2512 + MP01.
+                            my_to_item_final = add_period_strings(x_period_1, my_to_item.to_item)
+                            #Step215 YBlock2 = YBlock1 (create independent copy)
+                            y_block_2 = copy.copy(y_block_1)
+                            #Step220 YBlock2.PPC = x_period_1; YBlock2.NP = MyToItemFinal
+                            y_block_2.prev_ppc = x_period_1
+                            y_block_2.now_np = my_to_item_final
 
+                            #Step230 Create SoCell instance
+                            # Insert to ToSoCell:
+                            # (NowYBlock = NowYBlock2, NowXPeriod = MyXPeriod, NowValue = NowValue2;
+                            # PrevYBlock = NowYBlock1, PrevXPeriod = MyXPeriod, PrevValue = NowValue1;
+                            # ByType = ByType, ByPercent = ByPercent)
+
+                            insert_so_cell = create_socell_from_yblocks(
+                                y_block_2=y_block_2,
+                                y_block_1=y_block_1,
+                                x_period_1=my_to_item_final,
+                                value_2=value_2,
+                                prev_ppc=x_period_1,
+                                value_1=value_1,
+                                by_type=my_by_type,
+                                by_percent=by_percent
+                            )
+                            # TODO: Insert new_socell to database
+
+                            
+
+                #TODO remove it when calculating all
                 count_flag = count_flag + 1
             
         
