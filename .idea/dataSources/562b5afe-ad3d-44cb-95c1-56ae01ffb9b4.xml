@@ -8,7 +8,7 @@
       <Current>1</Current>
     </database>
     <schema id="3" parent="2" name="alloc_stage">
-      <LastIntrospectionLocalTimestamp>2025-12-25.10:38:52</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2025-12-26.08:26:23</LastIntrospectionLocalTimestamp>
     </schema>
     <schema id="4" parent="2" name="allocation_config">
       <LastIntrospectionLocalTimestamp>2025-12-25.10:39:15</LastIntrospectionLocalTimestamp>

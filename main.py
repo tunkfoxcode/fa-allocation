@@ -5,6 +5,134 @@ from typing import Optional, List
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
+#BIGQUERY CONNECTOR
+class BigQueryConnector:
+    def __init__(self, credentials_path=None, project_id=None):
+        """
+        Khởi tạo kết nối tới Google BigQuery
+
+        Args:
+            credentials_path: Đường dẫn tới file JSON service account key
+            project_id: ID của Google Cloud Project
+        """
+        if credentials_path:
+            credentials = service_account.Credentials.from_service_account_file(
+                credentials_path,
+                scopes=["https://www.googleapis.com/auth/bigquery"]
+            )
+            self.client = bigquery.Client(credentials=credentials, project=project_id)
+        else:
+            self.client = bigquery.Client(project=project_id)
+
+        print(f"✓ Đã kết nối thành công tới BigQuery project: {self.client.project}")
+
+    def execute_query(self, query):
+        """
+        Thực thi query và trả về kết quả
+
+        Args:
+            query: SQL query string
+
+        Returns:
+            DataFrame chứa kết quả query
+        """
+        try:
+            query_job = self.client.query(query)
+            results = query_job.result()
+            df = results.to_dataframe()
+            return df
+        except Exception as e:
+            print(f"✗ Error when executing query: {str(e)}")
+            raise
+
+    def list_datasets(self):
+        """Liệt kê tất cả datasets trong project"""
+        datasets = list(self.client.list_datasets())
+        if datasets:
+            print(f"Datasets trong project {self.client.project}:")
+            for dataset in datasets:
+                print(f"  - {dataset.dataset_id}")
+        else:
+            print(f"Project {self.client.project} không có dataset nào")
+        return datasets
+
+    def list_tables(self, dataset_id):
+        """Liệt kê tất cả tables trong một dataset"""
+        tables = list(self.client.list_tables(dataset_id))
+        if tables:
+            print(f"Tables trong dataset {dataset_id}:")
+            for table in tables:
+                print(f"  - {table.table_id}")
+        else:
+            print(f"Dataset {dataset_id} không có table nào")
+        return tables
+
+    def get_table_schema(self, dataset_id, table_id):
+        """Lấy schema của một table"""
+        table_ref = f"{self.client.project}.{dataset_id}.{table_id}"
+        table = self.client.get_table(table_ref)
+        print(f"Schema của table {table_ref}:")
+        for field in table.schema:
+            print(f"  - {field.name}: {field.field_type}")
+        return table.schema
+
+    def insert_row(self, dataset_id, table_id, row_data):
+        """
+        Insert một row vào BigQuery table
+
+        Args:
+            dataset_id: Dataset ID
+            table_id: Table ID
+            row_data: Dictionary hoặc dataclass instance chứa dữ liệu cần insert
+
+        Returns:
+            True nếu insert thành công, False nếu có lỗi
+        """
+        try:
+            from decimal import Decimal
+
+            table_ref = f"{self.client.project}.{dataset_id}.{table_id}"
+            table = self.client.get_table(table_ref)
+
+            # Convert dataclass to dict if needed
+            if hasattr(row_data, '__dataclass_fields__'):
+                from dataclasses import asdict
+                row_dict = asdict(row_data)
+            else:
+                row_dict = row_data
+
+            # Convert Decimal to float and round for JSON serialization
+            def convert_decimals(obj):
+                if isinstance(obj, dict):
+                    return {k: convert_decimals(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_decimals(item) for item in obj]
+                elif isinstance(obj, Decimal):
+                    # Round to 9 decimal places for BigQuery NUMERIC compatibility
+                    return round(float(obj), 9)
+                elif isinstance(obj, float):
+                    # Round float to 9 decimal places for BigQuery NUMERIC compatibility
+                    return round(obj, 9)
+                else:
+                    return obj
+
+            row_dict = convert_decimals(row_dict)
+
+            # Insert row
+            errors = self.client.insert_rows_json(table, [row_dict])
+
+            if errors:
+                print(f"✗ Errors occurred while inserting row: {errors}")
+                return False
+            else:
+                print(f"✓ Successfully inserted 1 row into {table_ref}")
+                return True
+
+        except Exception as e:
+            print(f"✗ Error when inserting row: {str(e)}")
+            return False
+#END BIGQUERY CONNECTOR
+
 
 @dataclass
 class AllocationALT:
@@ -1032,13 +1160,13 @@ def create_socell_from_yblocks(
     y_block_1: 'SoCell',
     x_period_1: str,
     value_2: float,
-    prev_ppc: str,
     value_1: float,
     by_type: str,
     by_percent: float
 ) -> 'SoCell':
     return SoCell(
         # NowYBlock = NowYBlock2
+        now_y_block_fnf_fnf=y_block_2.now_y_block_fnf_fnf,
         now_y_block_kr_item_code_kr1=y_block_2.now_y_block_kr_item_code_kr1,
         now_y_block_kr_item_code_kr2=y_block_2.now_y_block_kr_item_code_kr2,
         now_y_block_kr_item_code_kr3=y_block_2.now_y_block_kr_item_code_kr3,
@@ -1082,7 +1210,7 @@ def create_socell_from_yblocks(
         now_y_block_unit=y_block_2.now_y_block_unit,
 
         # NowXPeriod=x_period_1
-        now_np=x_period_1,
+        now_np=y_block_2.now_np,
 
         #NowValue = NowValue2
         now_value=value_2,
@@ -1130,6 +1258,7 @@ def create_socell_from_yblocks(
         prev_y_block_unit=y_block_1.now_y_block_unit,
 
         # PrevXPeriod=x_period_1)
+        #Buglist2
         prev_y_block_period_np=x_period_1,
 
         # PrevValue=NowValue1
@@ -1140,21 +1269,21 @@ def create_socell_from_yblocks(
         by_block_bytype=by_type,
 
         #ByPercent
-        by_block_bypercent=by_percent
+        by_block_bypercent=by_percent,
     )
 
 
 def add_period_strings(base_period: str, offset_period: str) -> str:
     """
     Cộng 2 chuỗi thời gian lại với nhau.
-    
+
     Args:
         base_period: Chuỗi dạng "M2907" (tháng 7 năm 2029)
         offset_period: Chuỗi dạng "MP04" (plus 4 tháng)
-    
+
     Returns:
         Chuỗi kết quả dạng "M2911" (tháng 11 năm 2029)
-    
+
     Example:
         >>> add_period_strings("M2907", "MP04")
         "M2911"
@@ -1164,105 +1293,273 @@ def add_period_strings(base_period: str, offset_period: str) -> str:
     # Parse base_period: M2907 -> year=2029, month=7
     if not base_period or len(base_period) < 5 or base_period[0] != 'M':
         raise ValueError(f"Invalid base_period format: {base_period}. Expected format: M2907")
-    
+
     year_str = base_period[1:3]  # "29"
     month_str = base_period[3:5]  # "07"
     base_year = 2000 + int(year_str)  # 2029
     base_month = int(month_str)  # 7
-    
+
     # Parse offset_period: MP04 -> offset=4
     if not offset_period or len(offset_period) < 4 or not offset_period.startswith('MP'):
         raise ValueError(f"Invalid offset_period format: {offset_period}. Expected format: MP04")
-    
+
     offset_months = int(offset_period[2:])  # 4
-    
+
     # Calculate new month and year
     total_months = base_month + offset_months
     new_year = base_year + (total_months - 1) // 12
     new_month = ((total_months - 1) % 12) + 1
-    
+
     # Format result: M2911
     year_suffix = str(new_year)[-2:]  # "29" or "30"
+    result = f"M{year_suffix}{new_month:02d}"
+
+    return result
+
+
+def create_socell_for_offset(
+    y_block_1: 'SoCell',
+    to_alt: str,
+    x_period_2: str,
+    x_period_1: str,
+    value_1: float,
+    by_type: str,
+    z_number: int
+) -> 'SoCell':
+    """
+    Tạo SoCell instance cho trường hợp offset (NowYBlock = PrevYBlock = YBlock1)
+    
+    Args:
+        y_block_1: SoCell instance (YBlock1)
+        to_alt: MyToALT
+        x_period_2: XPeriod2 (calculated from offset)
+        x_period_1: XPeriod1 (original)
+        value_1: Value1
+        by_type: MyAllocationByTypeItem.ByType
+        z_number: MyAllocationALTItem.ZNumber
+    
+    Returns:
+        SoCell instance mới
+    """
+    return SoCell(
+        # NowYBlock = YBlock1 (copy all now fields from y_block_1)
+        now_y_block_kr_item_code_kr1=y_block_1.now_y_block_kr_item_code_kr1,
+        now_y_block_kr_item_code_kr2=y_block_1.now_y_block_kr_item_code_kr2,
+        now_y_block_kr_item_code_kr3=y_block_1.now_y_block_kr_item_code_kr3,
+        now_y_block_kr_item_code_kr4=y_block_1.now_y_block_kr_item_code_kr4,
+        now_y_block_kr_item_code_kr5=y_block_1.now_y_block_kr_item_code_kr5,
+        now_y_block_kr_item_code_kr6=y_block_1.now_y_block_kr_item_code_kr6,
+        now_y_block_kr_item_code_kr7=y_block_1.now_y_block_kr_item_code_kr7,
+        now_y_block_kr_item_code_kr8=y_block_1.now_y_block_kr_item_code_kr8,
+        now_y_block_cdt_cdt1=y_block_1.now_y_block_cdt_cdt1,
+        now_y_block_cdt_cdt2=y_block_1.now_y_block_cdt_cdt2,
+        now_y_block_cdt_cdt3=y_block_1.now_y_block_cdt_cdt3,
+        now_y_block_cdt_cdt4=y_block_1.now_y_block_cdt_cdt4,
+        now_y_block_ptnow_pt1=y_block_1.now_y_block_ptnow_pt1,
+        now_y_block_ptnow_pt2=y_block_1.now_y_block_ptnow_pt2,
+        now_y_block_ptnow_duration=y_block_1.now_y_block_ptnow_duration,
+        now_y_block_ptprev_pt1=y_block_1.now_y_block_ptprev_pt1,
+        now_y_block_ptprev_pt2=y_block_1.now_y_block_ptprev_pt2,
+        now_y_block_ptprev_duration=y_block_1.now_y_block_ptprev_duration,
+        now_y_block_ptfix_owntype=y_block_1.now_y_block_ptfix_owntype,
+        now_y_block_ptfix_aitype=y_block_1.now_y_block_ptfix_aitype,
+        now_y_block_ptsub_cty1=y_block_1.now_y_block_ptsub_cty1,
+        now_y_block_ptsub_cty2=y_block_1.now_y_block_ptsub_cty2,
+        now_y_block_ptsub_ostype=y_block_1.now_y_block_ptsub_ostype,
+        now_y_block_funnel_fu1=y_block_1.now_y_block_funnel_fu1,
+        now_y_block_funnel_fu2=y_block_1.now_y_block_funnel_fu2,
+        now_y_block_channel_ch=y_block_1.now_y_block_channel_ch,
+        now_y_block_employee_egt1=y_block_1.now_y_block_employee_egt1,
+        now_y_block_employee_egt2=y_block_1.now_y_block_employee_egt2,
+        now_y_block_employee_egt3=y_block_1.now_y_block_employee_egt3,
+        now_y_block_employee_egt4=y_block_1.now_y_block_employee_egt4,
+        now_y_block_hr_hr1=y_block_1.now_y_block_hr_hr1,
+        now_y_block_hr_hr2=y_block_1.now_y_block_hr_hr2,
+        now_y_block_hr_hr3=y_block_1.now_y_block_hr_hr3,
+        now_y_block_sec=y_block_1.now_y_block_sec,
+        now_y_block_period_mx=y_block_1.now_y_block_period_mx,
+        now_y_block_period_dx=y_block_1.now_y_block_period_dx,
+        now_y_block_period_ppc=y_block_1.now_y_block_period_ppc,
+        now_y_block_period_np=y_block_1.now_y_block_period_np,
+        now_y_block_le_le1=y_block_1.now_y_block_le_le1,
+        now_y_block_le_le2=y_block_1.now_y_block_le_le2,
+        now_y_block_unit=y_block_1.now_y_block_unit,
+        
+        # NowALT = MyToALT
+        now_zblock2_alt=to_alt,
+        
+        # NowXPeriod = XPeriod2
+        now_np=x_period_2,
+        
+        # NowValue = Value1
+        now_value=value_1,
+        
+        # PrevYBlock = YBlock1 (same as NowYBlock)
+        prev_y_block_kr_item_code_kr1=y_block_1.now_y_block_kr_item_code_kr1,
+        prev_y_block_kr_item_code_kr2=y_block_1.now_y_block_kr_item_code_kr2,
+        prev_y_block_kr_item_code_kr3=y_block_1.now_y_block_kr_item_code_kr3,
+        prev_y_block_kr_item_code_kr4=y_block_1.now_y_block_kr_item_code_kr4,
+        prev_y_block_kr_item_code_kr5=y_block_1.now_y_block_kr_item_code_kr5,
+        prev_y_block_kr_item_code_kr6=y_block_1.now_y_block_kr_item_code_kr6,
+        prev_y_block_kr_item_code_kr7=y_block_1.now_y_block_kr_item_code_kr7,
+        prev_y_block_kr_item_code_kr8=y_block_1.now_y_block_kr_item_code_kr8,
+        prev_y_block_cdt_cdt1=y_block_1.now_y_block_cdt_cdt1,
+        prev_y_block_cdt_cdt2=y_block_1.now_y_block_cdt_cdt2,
+        prev_y_block_cdt_cdt3=y_block_1.now_y_block_cdt_cdt3,
+        prev_y_block_cdt_cdt4=y_block_1.now_y_block_cdt_cdt4,
+        prev_y_block_ptnow_pt1=y_block_1.now_y_block_ptnow_pt1,
+        prev_y_block_ptnow_pt2=y_block_1.now_y_block_ptnow_pt2,
+        prev_y_block_ptnow_duration=y_block_1.now_y_block_ptnow_duration,
+        prev_y_block_ptprev_pt1=y_block_1.now_y_block_ptprev_pt1,
+        prev_y_block_ptprev_pt2=y_block_1.now_y_block_ptprev_pt2,
+        prev_y_block_ptprev_duration=y_block_1.now_y_block_ptprev_duration,
+        prev_y_block_ptfix_owntype=y_block_1.now_y_block_ptfix_owntype,
+        prev_y_block_ptfix_aitype=y_block_1.now_y_block_ptfix_aitype,
+        prev_y_block_ptsub_cty1=y_block_1.now_y_block_ptsub_cty1,
+        prev_y_block_ptsub_cty2=y_block_1.now_y_block_ptsub_cty2,
+        prev_y_block_ptsub_ostype=y_block_1.now_y_block_ptsub_ostype,
+        prev_y_block_funnel_fu1=y_block_1.now_y_block_funnel_fu1,
+        prev_y_block_funnel_fu2=y_block_1.now_y_block_funnel_fu2,
+        prev_y_block_channel_ch=y_block_1.now_y_block_channel_ch,
+        prev_y_block_employee_egt1=y_block_1.now_y_block_employee_egt1,
+        prev_y_block_employee_egt2=y_block_1.now_y_block_employee_egt2,
+        prev_y_block_employee_egt3=y_block_1.now_y_block_employee_egt3,
+        prev_y_block_employee_egt4=y_block_1.now_y_block_employee_egt4,
+        prev_y_block_hr_hr1=y_block_1.now_y_block_hr_hr1,
+        prev_y_block_hr_hr2=y_block_1.now_y_block_hr_hr2,
+        prev_y_block_hr_hr3=y_block_1.now_y_block_hr_hr3,
+        prev_y_block_sec=y_block_1.now_y_block_sec,
+        prev_y_block_period_mx=y_block_1.now_y_block_period_mx,
+        prev_y_block_period_dx=y_block_1.now_y_block_period_dx,
+        prev_y_block_period_np=y_block_1.now_y_block_period_np,
+        prev_y_block_le_le1=y_block_1.now_y_block_le_le1,
+        prev_y_block_le_le2=y_block_1.now_y_block_le_le2,
+        prev_y_block_unit=y_block_1.now_y_block_unit,
+        
+        # PrevXPeriod = XPeriod1
+        prev_ppc=x_period_1,
+        
+        # PrevValue = Value1
+        prev_value=value_1,
+        
+        # ByType = MyAllocationByTypeItem.ByType
+        by_block_bytype=by_type,
+        
+        # ZNumber (for reference, though not directly in SoCell schema based on previous code)
+        # Note: If z_number is needed, it should be added to appropriate z_block fields
+    )
+
+
+def calculate_offset(
+    bq: 'BigQueryConnector',
+    my_allocation_by_type_item: 'AllocationByType',
+    my_allocation_alt_item: 'AllocationALT',
+    y_block_1: 'SoCell',
+    x_period_1: str,
+    value_1: float,
+    alloc_data_dataset_name: str,
+    so_cell_table_name: str
+) -> bool:
+    """
+    Xử lý trường hợp offset: tính x_period_2, tạo SoCell và insert vào BigQuery
+    
+    Args:
+        bq: BigQueryConnector instance
+        my_allocation_by_type_item: AllocationByType item chứa offset trong by_block_by_type
+        my_allocation_alt_item: AllocationALT item
+        y_block_1: SoCell instance (YBlock1)
+        x_period_1: XPeriod1
+        value_1: Value1
+        alloc_data_dataset_name: Dataset name
+        so_cell_table_name: Table name
+    
+    Returns:
+        True nếu insert thành công, False nếu thất bại
+    """
+    # Convert string to int offset
+    # OffsetMonth = TextToNum(MyAllocationByTypeItem.ByType)
+    offset_month = int(my_allocation_by_type_item.by_block_by_type)
+    
+    # Calculate x_period_2 from x_period_1 and offset
+    # XPeriod2 = ShiftMonth(XPeriod1, OffsetMonth)
+    x_period_2 = add_period_with_offset(x_period_1, offset_month)
+    print(f"[INFO] Offset case: offset={offset_month}, x_period_1={x_period_1}, x_period_2={x_period_2}")
+    
+    # Create SoCell for offset case
+    # Insert SOCell:
+    # NowYBlock = YBlock1, NowALT = MyToALT, NowXPeriod = Xperiod2, NowValue = Value1
+    # PrevYBlock = YBlock1, PrevXPeriod = XPeriod1, PreValue = Value1
+    # ByType = MyAllocationByTypeItem.ByType, ZNumber = MyAllocationALTItem.ZNumber
+    insert_so_cell_offset = create_socell_for_offset(
+        y_block_1=y_block_1,
+        to_alt=my_allocation_alt_item.to_alt,
+        x_period_2=x_period_2,
+        x_period_1=x_period_1,
+        value_1=value_1,
+        by_type=my_allocation_by_type_item.by_block_by_type,
+        z_number=my_allocation_alt_item.z_number
+    )
+    
+    # Insert to BigQuery
+    success = bq.insert_row(
+        dataset_id=alloc_data_dataset_name,
+        table_id=so_cell_table_name,
+        row_data=insert_so_cell_offset
+    )
+    
+    if success:
+        print(f"[INFO] Offset case: Successfully inserted SoCell with x_period_2={x_period_2}")
+    else:
+        print(f"[ERROR] Offset case: Failed to insert SoCell")
+    
+    return success
+
+
+def add_period_with_offset(base_period: str, offset: int) -> str:
+    """
+    Tính toán period mới dựa trên base_period và offset (có thể dương hoặc âm).
+    
+    Args:
+        base_period: Chuỗi dạng "M2501" (tháng 1 năm 2025)
+        offset: Số tháng cần cộng/trừ (dương = tịnh tiến, âm = lùi)
+    
+    Returns:
+        Chuỗi kết quả dạng "M2502" hoặc "M2412"
+    
+    Example:
+        >>> add_period_with_offset("M2501", 1)
+        "M2502"
+        >>> add_period_with_offset("M2501", -1)
+        "M2412"
+        >>> add_period_with_offset("M2512", 1)
+        "M2601"
+    """
+    # Parse base_period: M2501 -> year=2025, month=1
+    if not base_period or len(base_period) < 5 or base_period[0] != 'M':
+        raise ValueError(f"Invalid base_period format: {base_period}. Expected format: M2501")
+    
+    year_str = base_period[1:3]  # "25"
+    month_str = base_period[3:5]  # "01"
+    base_year = 2000 + int(year_str)  # 2025
+    base_month = int(month_str)  # 1
+    
+    # Calculate new month and year with offset
+    total_months = (base_year * 12 + base_month) + offset
+    new_year = (total_months - 1) // 12
+    new_month = ((total_months - 1) % 12) + 1
+    
+    # Format result: M2502
+    year_suffix = str(new_year)[-2:]  # "25" or "24"
     result = f"M{year_suffix}{new_month:02d}"
     
     return result
 
 
-class BigQueryConnector:
-    def __init__(self, credentials_path=None, project_id=None):
-        """
-        Khởi tạo kết nối tới Google BigQuery
-        
-        Args:
-            credentials_path: Đường dẫn tới file JSON service account key
-            project_id: ID của Google Cloud Project
-        """
-        if credentials_path:
-            credentials = service_account.Credentials.from_service_account_file(
-                credentials_path,
-                scopes=["https://www.googleapis.com/auth/bigquery"]
-            )
-            self.client = bigquery.Client(credentials=credentials, project=project_id)
-        else:
-            self.client = bigquery.Client(project=project_id)
-        
-        print(f"✓ Đã kết nối thành công tới BigQuery project: {self.client.project}")
-    
-    def execute_query(self, query):
-        """
-        Thực thi query và trả về kết quả
-        
-        Args:
-            query: SQL query string
-            
-        Returns:
-            DataFrame chứa kết quả query
-        """
-        try:
-            query_job = self.client.query(query)
-            results = query_job.result()
-            df = results.to_dataframe()
-            return df
-        except Exception as e:
-            print(f"✗ Error when executing query: {str(e)}")
-            raise
-    
-    def list_datasets(self):
-        """Liệt kê tất cả datasets trong project"""
-        datasets = list(self.client.list_datasets())
-        if datasets:
-            print(f"Datasets trong project {self.client.project}:")
-            for dataset in datasets:
-                print(f"  - {dataset.dataset_id}")
-        else:
-            print(f"Project {self.client.project} không có dataset nào")
-        return datasets
-    
-    def list_tables(self, dataset_id):
-        """Liệt kê tất cả tables trong một dataset"""
-        tables = list(self.client.list_tables(dataset_id))
-        if tables:
-            print(f"Tables trong dataset {dataset_id}:")
-            for table in tables:
-                print(f"  - {table.table_id}")
-        else:
-            print(f"Dataset {dataset_id} không có table nào")
-        return tables
-    
-    def get_table_schema(self, dataset_id, table_id):
-        """Lấy schema của một table"""
-        table_ref = f"{self.client.project}.{dataset_id}.{table_id}"
-        table = self.client.get_table(table_ref)
-        print(f"Schema của table {table_ref}:")
-        for field in table.schema:
-            print(f"  - {field.name}: {field.field_type}")
-        return table.schema
-
-
 def main():
     # Configuration
-    credentials_path = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"
-    project_id = "foxlearning"
+    # credentials_path = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"
+    credentials_path = "/home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json"
+    project_id = "fp-a-project"
     
     # Dataset names
     allocation_config_dataset_name = "allocation_config"
@@ -1334,24 +1631,21 @@ def main():
             
             print(f"[INFO][Step 50] We having {len(my_allocation_by_type_items)} my_allocation_by_type_items by query: \n {query_by_type}")
 
-            #TODO remove it to calculate all
-            count_flag = 0
-
             #Step60 Foreach MyAllocationByTypeItem (YNumber DECREASING):
             for my_allocation_by_type_item in my_allocation_by_type_items:
-                if my_allocation_by_type_item.to_y_block_kr1 != 'GI':
-                    continue
-                if count_flag > 0:
-                    print(f"[WARNING][Step 60] Only process for first my_allocation_by_type_item having to_y_block_kr1 = 'GI', need to remove this logic when calculating for production mode")
-                    continue
                 print(f"[INFO][Step 60] Processing for each my_allocation_by_type_item: {my_allocation_by_type_item}")
-                
+
+                if my_allocation_by_type_item.by_block_by_type == 'GAgg' or my_allocation_by_type_item.by_block_by_type == 'ByAgg':
+                    print("INFO][Step 60] Ignore process for this my_allocation_by_type_item because by type is GAgg or ByAgg")
+                    continue
+                # ELSECASE các loại Allocate ByXXX thông thường, Offset(ByType=Number), GAgg(aggregate bằng Gsheet, không cần code)
+
                 #Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
                 #Mapping each yblock from by_type to so_cell
                 #Build dynamic query base on the Y-block fields of my_allocation_by_type_item
                 query_so_cell = build_so_cell_query(
                     my_allocation_by_type_item, 
-                    project_id, 
+                    project_id,
                     dataset_id=alloc_data_dataset_name, 
                     table_id=so_cell_table_name
                 )
@@ -1362,7 +1656,7 @@ def main():
                 print(f"[INFO][Step 70] We having {len(from_so_cell_items)} from_so_cell_items by query: \n {query_so_cell}")
 
                 #Step80 Foreach FromSOCelItem(N)
-                for from_so_cell_item in from_so_cell_items[0:1]:
+                for from_so_cell_item in from_so_cell_items:
                     # Step90 (YBlock1, XPeriod1, Value1) = FromSOCelItem(NowYBlock, XPeriod, NowValue)
                     print(f"[INFO][Step 80] Start processing for each from_so_cell_item: {from_so_cell_item}")
                     y_block_1 = from_so_cell_item
@@ -1393,7 +1687,23 @@ def main():
                     if len(so_cells_prev_y_block) > 0:
                         print("[WARN][Step 120] Skip process because so_cells_prev_y_block is empty (N=0)")
                         continue
-                    
+
+                    # CASE MyAllocationByTypeItem.ByType = Number // Offset
+                    if my_allocation_by_type_item.by_block_by_type and str(my_allocation_by_type_item.by_block_by_type).lstrip('-').isdigit():
+                        # Call calculate_offset function
+                        calculate_offset(
+                            bq=bq,
+                            my_allocation_by_type_item=my_allocation_by_type_item,
+                            my_allocation_alt_item=my_allocation_alt_item,
+                            y_block_1=y_block_1,
+                            x_period_1=x_period_1,
+                            value_1=value_1,
+                            alloc_data_dataset_name=alloc_data_dataset_name,
+                            so_cell_table_name=so_cell_table_name
+                        )
+                        continue
+
+                    # ELSECASE // các loại Allocation ByXXX thông thường
                     #Step120 Start allocating
                     # Query AllocationByKR: WHERE TO_Y_BLOCK_KR6 = MyFromType 
                     # AND TO_Y_BLOCK_KR4 = MyToType 
@@ -1465,24 +1775,29 @@ def main():
                             # (NowYBlock = NowYBlock2, NowXPeriod = MyXPeriod, NowValue = NowValue2;
                             # PrevYBlock = NowYBlock1, PrevXPeriod = MyXPeriod, PrevValue = NowValue1;
                             # ByType = ByType, ByPercent = ByPercent)
+                            # now_zblock2_alt?
 
                             insert_so_cell = create_socell_from_yblocks(
                                 y_block_2=y_block_2,
                                 y_block_1=y_block_1,
-                                x_period_1=my_to_item_final,
+                                x_period_1=x_period_1,
                                 value_2=value_2,
-                                prev_ppc=x_period_1,
                                 value_1=value_1,
                                 by_type=my_by_type,
                                 by_percent=by_percent
                             )
-                            # TODO: Insert new_socell to database
-
                             
-
-                #TODO remove it when calculating all
-                count_flag = count_flag + 1
-            
+                            # Insert to BigQuery
+                            success = bq.insert_row(
+                                dataset_id=alloc_data_dataset_name,
+                                table_id=so_cell_table_name,
+                                row_data=insert_so_cell
+                            )
+                            if success:
+                                print(f"[INFO][Step 230] Successfully inserted SoCell: {insert_so_cell}")
+                            else:
+                                print(f"[ERROR][Step 230] Failed to insert SoCell: {insert_so_cell}")
+        print("[INFO] ================> DONE")
         
     except Exception as e:
         print(f"Lỗi: {str(e)}")
