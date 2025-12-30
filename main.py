@@ -1560,6 +1560,100 @@ def add_period_with_offset(base_period: str, offset: int) -> str:
     return result
 
 
+def preload_all_data(bq, project_id, allocation_config_dataset_name, allocation_to_item_table_name, allocation_by_kr_table_name):
+    """
+    Pre-load tất cả dữ liệu cần thiết từ BigQuery để tránh query trong vòng lặp.
+    Tạo các index/dictionary để tra cứu nhanh O(1).
+    """
+    print("[INFO] Pre-loading all data...")
+    
+    # Load AllocationToItem
+    query_all_to_items = f"""
+    SELECT * FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}`
+    """
+    all_to_items_df = bq.execute_query(query_all_to_items)
+    all_to_items = AllocationToItem.from_dataframe(all_to_items_df)
+    
+    # Index by to_type
+    to_items_by_type = {}
+    for item in all_to_items:
+        if item.to_type not in to_items_by_type:
+            to_items_by_type[item.to_type] = []
+        to_items_by_type[item.to_type].append(item)
+    
+    # Load AllocationByKR
+    query_all_by_kr = f"""
+    SELECT * FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}`
+    """
+    all_by_kr_df = bq.execute_query(query_all_by_kr)
+    all_by_kr = AllocationByKR.from_dataframe(all_by_kr_df)
+    
+    # Index by (kr6, kr4, by_type)
+    by_kr_index = {}
+    for item in all_by_kr:
+        key = (item.to_y_block_kr6, item.to_y_block_kr4, item.by_block_by_type)
+        by_kr_index[key] = item
+    
+    # Load PT-S2, CTY-S2, NP-D365 items for ByAgg
+    pt_s2_items = [str(item.to_item) for item in all_to_items if item.to_type == 'PT-S2' and item.to_item is not None]
+    cty_s2_items = [str(item.to_item) for item in all_to_items if item.to_type == 'CTY-S2' and item.to_item is not None]
+    np_d365_items = [str(item.to_item) for item in all_to_items if item.to_type == 'NP-D365' and item.to_item is not None]
+    
+    print(f"[INFO] Pre-loaded: {len(all_to_items)} to_items, {len(all_by_kr)} by_kr items")
+    print(f"[INFO] Indexed: {len(to_items_by_type)} to_type groups, {len(by_kr_index)} by_kr combinations")
+    
+    return {
+        'to_items_by_type': to_items_by_type,
+        'by_kr_index': by_kr_index,
+        'pt_s2_items': pt_s2_items,
+        'cty_s2_items': cty_s2_items,
+        'np_d365_items': np_d365_items
+    }
+
+
+def batch_insert_rows(bq, dataset_id, table_id, rows):
+    """
+    Batch insert nhiều rows cùng lúc để giảm số lần gọi API.
+    """
+    if not rows:
+        return True
+    
+    from decimal import Decimal
+    
+    table_ref = f"{bq.client.project}.{dataset_id}.{table_id}"
+    table = bq.client.get_table(table_ref)
+    
+    def convert_decimals(obj):
+        if isinstance(obj, dict):
+            return {k: convert_decimals(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_decimals(item) for item in obj]
+        elif isinstance(obj, Decimal):
+            return round(float(obj), 9)
+        elif isinstance(obj, float):
+            return round(obj, 9)
+        else:
+            return obj
+    
+    rows_to_insert = []
+    for row_data in rows:
+        if hasattr(row_data, '__dataclass_fields__'):
+            from dataclasses import asdict
+            row_dict = asdict(row_data)
+        else:
+            row_dict = row_data
+        rows_to_insert.append(convert_decimals(row_dict))
+    
+    errors = bq.client.insert_rows_json(table, rows_to_insert)
+    
+    if errors:
+        print(f"✗ Errors occurred while batch inserting {len(rows)} rows: {errors}")
+        return False
+    else:
+        print(f"✓ Successfully batch inserted {len(rows)} rows into {table_ref}")
+        return True
+
+
 def main():
     # Configuration
     # credentials_path = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"
@@ -1584,6 +1678,12 @@ def main():
             project_id=project_id
         )
         
+        # Pre-load tất cả dữ liệu cần thiết
+        preloaded_data = preload_all_data(
+            bq, project_id, allocation_config_dataset_name, 
+            allocation_to_item_table_name, allocation_by_kr_table_name
+        )
+        
         #Step20 Query from AllocationALT: MyAllocationALTItem (N)
         query = f"""
         SELECT
@@ -1603,22 +1703,16 @@ def main():
         #Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
         for my_allocation_alt_item in my_allocation_alt_items:
             # TODO remove it to calculate all
-            if my_allocation_alt_item.z_number != 330:
+            if my_allocation_alt_item.z_number != 422:
                 print(f"[WARN][Step 30] Skip process my_allocation_alt_item: {my_allocation_alt_item} because z_number is not equal 422 for testing purpose, remove it when calculating in production mode")
                 continue
             print(f"[INFO][Step 30] Start process each my_allocation_alt_item: {my_allocation_alt_item}")
             #Step35 Query from AllocationToItem: (MyFromType) -> MyFromItemAllowed (N) // PT0 -> "Null"; PT1 -> Game, Util, Productivity...
             #Step40 Query from AllocationToItem: (MyToType) -> MyToItem (N)
-            # Query AllocationToItem dựa trên to_type của allocation
-            query_to_item = f"""
-            SELECT * 
-            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
-            WHERE TO_Y_BLOCK_ToType = "{my_allocation_alt_item.to_type}"
-            """
-            my_to_items_raw = bq.execute_query(query_to_item)
-            my_to_items = AllocationToItem.from_dataframe(my_to_items_raw)
+            # Sử dụng pre-loaded data thay vì query
+            my_to_items = preloaded_data['to_items_by_type'].get(my_allocation_alt_item.to_type, [])
 
-            print(f"[INFO][Step 40] We having {len(my_to_items)} my_to_items by query: \n {query_to_item}")
+            print(f"[INFO][Step 40] We having {len(my_to_items)} my_to_items from pre-loaded data for to_type={my_allocation_alt_item.to_type}")
 
             #Step50 Query from AllocationByType: (ZNumber) -> MyAllocationByTypeItem (YNumber, Y-Block, MyByType) (N)
             # Query AllocationByType dựa trên z_number của allocation
@@ -1645,37 +1739,15 @@ def main():
                     continue
 
                 if my_allocation_by_type_item.by_block_by_type == 'ByAgg':
-                    # Query AllocationToItem for ByAgg case
-                    query_pt_s2 = f"""
-                    SELECT TO_Y_BLOCK_ToItem 
-                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
-                    WHERE TO_Y_BLOCK_ToType = 'PT-S2'
-                    """
-                    pt_s2_raw = bq.execute_query(query_pt_s2)
+                    # Sử dụng pre-loaded data thay vì query
+                    pt_s2_items = preloaded_data['pt_s2_items']
+                    cty_s2_items = preloaded_data['cty_s2_items']
+                    np_d365_items = preloaded_data['np_d365_items']
                     
-                    pt_s2_items = [
-                        str(item) for item in pt_s2_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
-                    ]
-
-                    query_cty_s2 = f"""
-                                        SELECT TO_Y_BLOCK_ToItem 
-                                        FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
-                                        WHERE TO_Y_BLOCK_ToType = 'CTY-S2'
-                                        """
-                    cty_s2_raw = bq.execute_query(query_cty_s2)
-                    cty_s2_items = [
-                        str(item) for item in cty_s2_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
-                    ]
-
-                    query_np_d365 = f"""
-                                                            SELECT TO_Y_BLOCK_ToItem 
-                                                            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
-                                                            WHERE TO_Y_BLOCK_ToType = 'NP-D365'
-                                                            """
-                    np_d365_raw = bq.execute_query(query_np_d365)
-                    np_d365_items = [
-                        str(item) for item in np_d365_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
-                    ]
+                    print(f"[INFO][Step 60] ByAgg case: Using pre-loaded PT-S2({len(pt_s2_items)}), CTY-S2({len(cty_s2_items)}), NP-D365({len(np_d365_items)})")
+                    
+                    # Batch collect all inserts
+                    byagg_inserts = []
                     for my_to_item_pts2 in pt_s2_items:
                         for my_to_item_ctys2 in cty_s2_items:
                             for my_to_item_np_d365 in np_d365_items:
@@ -1826,17 +1898,17 @@ def main():
                                     by_block_bypercent=None
                                 )
                                 
-                                # Insert to BigQuery
-                                success = bq.insert_row(
-                                    dataset_id=alloc_data_dataset_name,
-                                    table_id=so_cell_table_name,
-                                    row_data=insert_so_cell_byagg
-                                )
-                                if success:
-                                    print(f"[INFO] ByAgg: Successfully inserted aggregated SoCell with value={value_2}, PTS2={my_to_item_pts2}, CTYS2={my_to_item_ctys2}, NPD365={my_to_item_np_d365}")
-                                else:
-                                    print(f"[ERROR] ByAgg: Failed to insert aggregated SoCell")
-
+                                # Collect for batch insert
+                                byagg_inserts.append(insert_so_cell_byagg)
+                                print(f"[INFO] ByAgg: Prepared SoCell with value={value_2}, PTS2={my_to_item_pts2}, CTYS2={my_to_item_ctys2}, NPD365={my_to_item_np_d365}")
+                    
+                    # Batch insert all ByAgg records
+                    if byagg_inserts:
+                        success = batch_insert_rows(bq, alloc_data_dataset_name, so_cell_table_name, byagg_inserts)
+                        if success:
+                            print(f"[INFO] ByAgg: Successfully batch inserted {len(byagg_inserts)} SoCells")
+                        else:
+                            print(f"[ERROR] ByAgg: Failed to batch insert SoCells")
                     continue
 
                 #ELSECASE các loại Allocate ByXXX thông thường, Offset(ByType=Number), GAgg(aggregate bằng Gsheet, không cần code)
@@ -1855,6 +1927,9 @@ def main():
                 from_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
                 print(f"[INFO][Step 70] We having {len(from_so_cell_items)} from_so_cell_items by query: \n {query_so_cell}")
 
+                # Batch collect all inserts for this by_type_item
+                batch_inserts = []
+                
                 #Step80 Foreach FromSOCelItem(N)
                 for from_so_cell_item in from_so_cell_items:
                     # Step90 (YBlock1, XPeriod1, Value1) = FromSOCelItem(NowYBlock, XPeriod, NowValue)
@@ -1905,30 +1980,20 @@ def main():
 
                     # ELSECASE // các loại Allocation ByXXX thông thường
                     #Step120 Start allocating
-                    # Query AllocationByKR: WHERE TO_Y_BLOCK_KR6 = MyFromType 
-                    # AND TO_Y_BLOCK_KR4 = MyToType 
-                    # AND BY_BLOCK_ByType = MyByType
+                    # Sử dụng pre-loaded index thay vì query
                     my_from_type = my_allocation_alt_item.from_type  # MyFromType
                     my_to_type = my_allocation_alt_item.to_type      # MyToType
                     my_by_type = my_allocation_by_type_item.by_block_by_type  # MyByType
                     
-                    query_allocation_by_kr = f"""
-                    SELECT * 
-                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}` 
-                    WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
-                    AND TO_Y_BLOCK_KR4 = '{my_to_type}'
-                    AND BY_BLOCK_ByType = '{my_by_type}'
-                    """
-                    allocation_by_kr_raw = bq.execute_query(query_allocation_by_kr)
-                    allocation_by_kr_items = AllocationByKR.from_dataframe(allocation_by_kr_raw)
+                    # Tra cứu O(1) từ index
+                    key = (my_from_type, my_to_type, my_by_type)
+                    allocation_by_kr_item = preloaded_data['by_kr_index'].get(key)
                     
-                    print(f"[INFO] We having {len(allocation_by_kr_items)} allocation_by_kr_items by query: \n {query_allocation_by_kr}")
-
-                    if len(allocation_by_kr_items) < 0:
-                        print("[WARN] Skip process because allocation_by_kr_items is empty")
+                    if not allocation_by_kr_item:
+                        print(f"[WARN] No allocation_by_kr_item found for key={key}")
                         continue
-                    allocation_by_kr_item = allocation_by_kr_items[0]
-                    print(f"[INFO] We have allocation_by_kr_item by picking the first element of allocation_by_kr_items: {allocation_by_kr_item}")
+                    
+                    print(f"[INFO] Found allocation_by_kr_item from pre-loaded index: {allocation_by_kr_item}")
                     #Step130
                     # KRBlock3 = BY_BLOCK_ByType & "-TO-" & TO_Y_BLOCK_KR4 & "-FROM-" & TO_Y_BLOCK_KR6
                     # kr_block_3 = allocation_by_kr_item.by_block_by_type + "-TO-" + allocation_by_kr_item.to_y_block_kr4 + "-FROM-" + allocation_by_kr_item.to_y_block_kr6
@@ -1987,16 +2052,17 @@ def main():
                                 by_percent=by_percent
                             )
                             
-                            # Insert to BigQuery
-                            success = bq.insert_row(
-                                dataset_id=alloc_data_dataset_name,
-                                table_id=so_cell_table_name,
-                                row_data=insert_so_cell
-                            )
-                            if success:
-                                print(f"[INFO][Step 230] Successfully inserted SoCell: {insert_so_cell}")
-                            else:
-                                print(f"[ERROR][Step 230] Failed to insert SoCell: {insert_so_cell}")
+                            # Collect for batch insert
+                            batch_inserts.append(insert_so_cell)
+                            print(f"[INFO][Step 230] Prepared SoCell for batch insert: {insert_so_cell}")
+                
+                # Batch insert all records for this by_type_item
+                if batch_inserts:
+                    success = batch_insert_rows(bq, alloc_data_dataset_name, so_cell_table_name, batch_inserts)
+                    if success:
+                        print(f"[INFO] Successfully batch inserted {len(batch_inserts)} SoCells for by_type_item")
+                    else:
+                        print(f"[ERROR] Failed to batch insert SoCells for by_type_item")
         print("[INFO] ================> DONE")
         
     except Exception as e:
