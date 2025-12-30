@@ -1256,6 +1256,8 @@ def create_socell_from_yblocks(
         prev_y_block_le_le1=y_block_1.now_y_block_le_le1,
         prev_y_block_le_le2=y_block_1.now_y_block_le_le2,
         prev_y_block_unit=y_block_1.now_y_block_unit,
+        prev_y_block_fnf_fnf=y_block_1.now_y_block_fnf_fnf,
+        prev_y_block_kr_item_name=y_block_1.now_y_block_kr_item_name,
 
         # PrevXPeriod=x_period_1)
         #Buglist2
@@ -1270,6 +1272,9 @@ def create_socell_from_yblocks(
 
         #ByPercent
         by_block_bypercent=by_percent,
+
+
+        now_zblock2_alt=y_block_1.now_zblock2_alt,
     )
 
 
@@ -1598,7 +1603,7 @@ def main():
         #Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
         for my_allocation_alt_item in my_allocation_alt_items:
             # TODO remove it to calculate all
-            if my_allocation_alt_item.z_number != 422:
+            if my_allocation_alt_item.z_number != 330:
                 print(f"[WARN][Step 30] Skip process my_allocation_alt_item: {my_allocation_alt_item} because z_number is not equal 422 for testing purpose, remove it when calculating in production mode")
                 continue
             print(f"[INFO][Step 30] Start process each my_allocation_alt_item: {my_allocation_alt_item}")
@@ -1635,11 +1640,206 @@ def main():
             for my_allocation_by_type_item in my_allocation_by_type_items:
                 print(f"[INFO][Step 60] Processing for each my_allocation_by_type_item: {my_allocation_by_type_item}")
 
-                if my_allocation_by_type_item.by_block_by_type == 'GAgg' or my_allocation_by_type_item.by_block_by_type == 'ByAgg':
+                if my_allocation_by_type_item.by_block_by_type == 'GAgg':
                     print("INFO][Step 60] Ignore process for this my_allocation_by_type_item because by type is GAgg or ByAgg")
                     continue
-                # ELSECASE các loại Allocate ByXXX thông thường, Offset(ByType=Number), GAgg(aggregate bằng Gsheet, không cần code)
 
+                if my_allocation_by_type_item.by_block_by_type == 'ByAgg':
+                    # Query AllocationToItem for ByAgg case
+                    query_pt_s2 = f"""
+                    SELECT TO_Y_BLOCK_ToItem 
+                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+                    WHERE TO_Y_BLOCK_ToType = 'PT-S2'
+                    """
+                    pt_s2_raw = bq.execute_query(query_pt_s2)
+                    
+                    pt_s2_items = [
+                        str(item) for item in pt_s2_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
+                    ]
+
+                    query_cty_s2 = f"""
+                                        SELECT TO_Y_BLOCK_ToItem 
+                                        FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+                                        WHERE TO_Y_BLOCK_ToType = 'CTY-S2'
+                                        """
+                    cty_s2_raw = bq.execute_query(query_cty_s2)
+                    cty_s2_items = [
+                        str(item) for item in cty_s2_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
+                    ]
+
+                    query_np_d365 = f"""
+                                                            SELECT TO_Y_BLOCK_ToItem 
+                                                            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+                                                            WHERE TO_Y_BLOCK_ToType = 'NP-D365'
+                                                            """
+                    np_d365_raw = bq.execute_query(query_np_d365)
+                    np_d365_items = [
+                        str(item) for item in np_d365_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
+                    ]
+                    for my_to_item_pts2 in pt_s2_items:
+                        for my_to_item_ctys2 in cty_s2_items:
+                            for my_to_item_np_d365 in np_d365_items:
+                                # Query SoCell for ByAgg case
+                                query_so_cell_byagg = f"""
+                                SELECT * 
+                                FROM `{project_id}.{alloc_data_dataset_name}.{so_cell_table_name}` 
+                                WHERE now_y_block_fnf_fnf = "KRN"
+                                AND now_y_block_kr_item_code_kr1 = "NO"
+                                AND now_y_block_kr_item_code_kr2 = "GI"
+                                AND now_y_block_kr_item_code_kr3 = "DAU"
+                                AND now_y_block_kr_item_code_kr4 = "DC"
+                                AND now_y_block_kr_item_code_kr5 = "NP"
+                                AND CONCAT(now_y_block_ptnow_pt1, now_y_block_ptnow_pt2) = '{my_to_item_pts2}'
+                                AND CONCAT(now_y_block_ptsub_cty1, now_y_block_ptsub_cty2) = '{my_to_item_ctys2}'
+                                AND NOW_NP = '{my_to_item_np_d365}'
+                                AND now_y_block_cdt_cdt1 IS NOT NULL
+                                AND now_y_block_cdt_cdt2 IS NOT NULL
+                                AND now_y_block_cdt_cdt3 IS NOT NULL
+                                AND now_y_block_cdt_cdt4 IS NOT NULL
+                                """
+                                so_cell_byagg_raw = bq.execute_query(query_so_cell_byagg)
+                                so_cell_byagg_items = SoCell.from_dataframe(so_cell_byagg_raw)
+
+                                value_2 = 0
+
+                                for so_cell_byagg_item in so_cell_byagg_items:
+                                    value_1 = so_cell_byagg_item.now_value
+                                    if value_1 is None:
+                                        continue
+                                    value_2 = value_2 + value_1
+
+                                # Write to SOCell: KR, Filter như trên, CDT=Null, NowValue = Value2 = sum (SOCell1))
+                                # Parse my_to_item_pts2 to get pt1 and pt2
+                                pt1 = my_to_item_pts2[:2] if len(my_to_item_pts2) >= 2 else my_to_item_pts2
+                                pt2 = my_to_item_pts2[2:] if len(my_to_item_pts2) > 2 else None
+                                
+                                # Parse my_to_item_ctys2 to get cty1 and cty2
+                                cty1 = my_to_item_ctys2[:2] if len(my_to_item_ctys2) >= 2 else my_to_item_ctys2
+                                cty2 = my_to_item_ctys2[2:] if len(my_to_item_ctys2) > 2 else None
+                                
+                                # Create SoCell for ByAgg aggregation
+                                insert_so_cell_byagg = SoCell(
+                                    # KR fields as specified
+                                    now_y_block_fnf_fnf="KRN",
+                                    now_y_block_kr_item_code_kr1="NO",
+                                    now_y_block_kr_item_code_kr2="GI",
+                                    now_y_block_kr_item_code_kr3="DAU",
+                                    now_y_block_kr_item_code_kr4="DC",
+                                    now_y_block_kr_item_code_kr5="NP",
+                                    now_y_block_kr_item_code_kr6=None,
+                                    now_y_block_kr_item_code_kr7=None,
+                                    now_y_block_kr_item_code_kr8=None,
+                                    
+                                    # CDT = Null
+                                    now_y_block_cdt_cdt1=None,
+                                    now_y_block_cdt_cdt2=None,
+                                    now_y_block_cdt_cdt3=None,
+                                    now_y_block_cdt_cdt4=None,
+                                    
+                                    # PT fields from my_to_item_pts2
+                                    now_y_block_ptnow_pt1=pt1,
+                                    now_y_block_ptnow_pt2=pt2,
+                                    now_y_block_ptnow_duration=None,
+                                    now_y_block_ptprev_pt1=None,
+                                    now_y_block_ptprev_pt2=None,
+                                    now_y_block_ptprev_duration=None,
+                                    now_y_block_ptfix_owntype=None,
+                                    now_y_block_ptfix_aitype=None,
+                                    
+                                    # CTY fields from my_to_item_ctys2
+                                    now_y_block_ptsub_cty1=cty1,
+                                    now_y_block_ptsub_cty2=cty2,
+                                    now_y_block_ptsub_ostype=None,
+                                    
+                                    # Other fields
+                                    now_y_block_funnel_fu1=None,
+                                    now_y_block_funnel_fu2=None,
+                                    now_y_block_channel_ch=None,
+                                    now_y_block_employee_egt1=None,
+                                    now_y_block_employee_egt2=None,
+                                    now_y_block_employee_egt3=None,
+                                    now_y_block_employee_egt4=None,
+                                    now_y_block_hr_hr1=None,
+                                    now_y_block_hr_hr2=None,
+                                    now_y_block_hr_hr3=None,
+                                    now_y_block_sec=None,
+                                    now_y_block_period_mx=None,
+                                    now_y_block_period_dx=None,
+                                    now_y_block_period_ppc=None,
+                                    now_y_block_period_np=None,
+                                    now_y_block_le_le1=None,
+                                    now_y_block_le_le2=None,
+                                    now_y_block_unit=None,
+                                    
+                                    # NP from my_to_item_np_d365
+                                    now_np=my_to_item_np_d365,
+                                    
+                                    # NowValue = Value2 (sum of all values)
+                                    now_value=value_2,
+                                    
+                                    # Prev fields = None
+                                    prev_y_block_kr_item_code_kr1=None,
+                                    prev_y_block_kr_item_code_kr2=None,
+                                    prev_y_block_kr_item_code_kr3=None,
+                                    prev_y_block_kr_item_code_kr4=None,
+                                    prev_y_block_kr_item_code_kr5=None,
+                                    prev_y_block_kr_item_code_kr6=None,
+                                    prev_y_block_kr_item_code_kr7=None,
+                                    prev_y_block_kr_item_code_kr8=None,
+                                    prev_y_block_cdt_cdt1=None,
+                                    prev_y_block_cdt_cdt2=None,
+                                    prev_y_block_cdt_cdt3=None,
+                                    prev_y_block_cdt_cdt4=None,
+                                    prev_y_block_ptnow_pt1=None,
+                                    prev_y_block_ptnow_pt2=None,
+                                    prev_y_block_ptnow_duration=None,
+                                    prev_y_block_ptprev_pt1=None,
+                                    prev_y_block_ptprev_pt2=None,
+                                    prev_y_block_ptprev_duration=None,
+                                    prev_y_block_ptfix_owntype=None,
+                                    prev_y_block_ptfix_aitype=None,
+                                    prev_y_block_ptsub_cty1=None,
+                                    prev_y_block_ptsub_cty2=None,
+                                    prev_y_block_ptsub_ostype=None,
+                                    prev_y_block_funnel_fu1=None,
+                                    prev_y_block_funnel_fu2=None,
+                                    prev_y_block_channel_ch=None,
+                                    prev_y_block_employee_egt1=None,
+                                    prev_y_block_employee_egt2=None,
+                                    prev_y_block_employee_egt3=None,
+                                    prev_y_block_employee_egt4=None,
+                                    prev_y_block_hr_hr1=None,
+                                    prev_y_block_hr_hr2=None,
+                                    prev_y_block_hr_hr3=None,
+                                    prev_y_block_sec=None,
+                                    prev_y_block_period_mx=None,
+                                    prev_y_block_period_dx=None,
+                                    prev_y_block_period_np=None,
+                                    prev_y_block_le_le1=None,
+                                    prev_y_block_le_le2=None,
+                                    prev_y_block_unit=None,
+                                    prev_ppc=None,
+                                    prev_value=None,
+                                    
+                                    # By fields
+                                    by_block_bytype='ByAgg',
+                                    by_block_bypercent=None
+                                )
+                                
+                                # Insert to BigQuery
+                                success = bq.insert_row(
+                                    dataset_id=alloc_data_dataset_name,
+                                    table_id=so_cell_table_name,
+                                    row_data=insert_so_cell_byagg
+                                )
+                                if success:
+                                    print(f"[INFO] ByAgg: Successfully inserted aggregated SoCell with value={value_2}, PTS2={my_to_item_pts2}, CTYS2={my_to_item_ctys2}, NPD365={my_to_item_np_d365}")
+                                else:
+                                    print(f"[ERROR] ByAgg: Failed to insert aggregated SoCell")
+
+                    continue
+
+                #ELSECASE các loại Allocate ByXXX thông thường, Offset(ByType=Number), GAgg(aggregate bằng Gsheet, không cần code)
                 #Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
                 #Mapping each yblock from by_type to so_cell
                 #Build dynamic query base on the Y-block fields of my_allocation_by_type_item
