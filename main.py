@@ -5,7 +5,8 @@ from typing import Optional, List
 from google.cloud import bigquery
 from google.oauth2 import service_account
 
-#BIGQUERY CONNECTOR
+
+# BIGQUERY CONNECTOR
 class BigQueryConnector:
     def __init__(self, credentials_path=None, project_id=None):
         """
@@ -131,7 +132,9 @@ class BigQueryConnector:
         except Exception as e:
             print(f"✗ Error when inserting row: {str(e)}")
             return False
-#END BIGQUERY CONNECTOR
+
+
+# END BIGQUERY CONNECTOR
 
 
 @dataclass
@@ -145,15 +148,15 @@ class AllocationALT:
     to_alt: Optional[str] = None
     from_type: Optional[str] = None
     to_type: Optional[str] = None
-    
+
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationALT':
         """
         Factory method để tạo instance từ BigQuery Row
-        
+
         Args:
             row: BigQuery Row object hoặc dictionary
-            
+
         Returns:
             AllocationALT instance
         """
@@ -161,7 +164,7 @@ class AllocationALT:
             data = dict(row.items())
         else:
             data = row
-            
+
         return cls(
             z_number=data.get('ZNumber'),
             from_alt=data.get('FROM_ALT_FromALT'),
@@ -169,15 +172,15 @@ class AllocationALT:
             from_type=data.get('FROM_Y_BLOCK_FromType'),
             to_type=data.get('TO_Y_BLOCK_ToType')
         )
-    
+
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationALT']:
         """
         Factory method để tạo list instances từ pandas DataFrame
-        
+
         Args:
             df: pandas DataFrame từ BigQuery query result
-            
+
         Returns:
             List of AllocationALT instances
         """
@@ -191,7 +194,7 @@ class AllocationALT:
             )
             for _, row in df.iterrows()
         ]
-    
+
     def __repr__(self) -> str:
         """String representation cho debugging"""
         return (f"AllocationALT(z_number={self.z_number}, "
@@ -210,15 +213,15 @@ class AllocationToItem:
     to_type: Optional[str] = None
     to_item: Optional[str] = None
     config_upload_at: Optional[int] = None
-    
+
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationToItem':
         """
         Factory method để tạo instance từ BigQuery Row
-        
+
         Args:
             row: BigQuery Row object hoặc dictionary
-            
+
         Returns:
             AllocationToItem instance
         """
@@ -226,7 +229,7 @@ class AllocationToItem:
             data = dict(row.items())
         else:
             data = row
-            
+
         return cls(
             from_type=data.get('FROM_Y_BLOCK_FromType'),
             from_item=data.get('FROM_Y_BLOCK_FromItem'),
@@ -234,15 +237,15 @@ class AllocationToItem:
             to_item=data.get('TO_Y_BLOCK_ToItem'),
             config_upload_at=data.get('Config_Upload_at')
         )
-    
+
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationToItem']:
         """
         Factory method để tạo list instances từ pandas DataFrame
-        
+
         Args:
             df: pandas DataFrame từ BigQuery query result
-            
+
         Returns:
             List of AllocationToItem instances
         """
@@ -256,7 +259,7 @@ class AllocationToItem:
             )
             for _, row in df.iterrows()
         ]
-    
+
     def __repr__(self) -> str:
         """String representation cho debugging"""
         return (f"AllocationToItem(from_type='{self.from_type}', "
@@ -315,15 +318,15 @@ class AllocationByType:
     to_y_block_unit: Optional[int] = None
     by_block_by_type: Optional[str] = None
     config_upload_at: Optional[int] = None
-    
+
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationByType':
         """
         Factory method để tạo instance từ BigQuery Row
-        
+
         Args:
             row: BigQuery Row object hoặc dictionary
-            
+
         Returns:
             AllocationByType instance
         """
@@ -331,7 +334,7 @@ class AllocationByType:
             data = dict(row.items())
         else:
             data = row
-            
+
         return cls(
             z_number=data.get('ZNumber'),
             y_number=data.get('YNumber'),
@@ -379,15 +382,15 @@ class AllocationByType:
             by_block_by_type=data.get('BY_BLOCK_ByType'),
             config_upload_at=data.get('Config_Upload_at')
         )
-    
+
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationByType']:
         """
         Factory method để tạo list instances từ pandas DataFrame
-        
+
         Args:
             df: pandas DataFrame từ BigQuery query result
-            
+
         Returns:
             List of AllocationByType instances
         """
@@ -441,7 +444,7 @@ class AllocationByType:
             )
             for _, row in df.iterrows()
         ]
-    
+
     def __repr__(self) -> str:
         """String representation cho debugging"""
         return (f"AllocationByType(z_number={self.z_number}, y_number={self.y_number}, "
@@ -502,7 +505,7 @@ class AllocationByKR:
     to_y_block_unit: Optional[int] = None
     by_block_by_type: Optional[str] = None
     config_upload_at: Optional[int] = None
-    
+
     @classmethod
     def from_bigquery_row(cls, row) -> 'AllocationByKR':
         """Factory method để tạo instance từ BigQuery Row"""
@@ -510,7 +513,7 @@ class AllocationByKR:
             data = dict(row.items())
         else:
             data = row
-            
+
         return cls(
             from_y_block_from_type=data.get('FROM_Y_BLOCK_FromType'),
             to_y_block_to_type=data.get('TO_Y_BLOCK_ToType'),
@@ -559,12 +562,12 @@ class AllocationByKR:
             by_block_by_type=data.get('BY_BLOCK_ByType'),
             config_upload_at=data.get('Config_Upload_at')
         )
-    
+
     @classmethod
     def from_dataframe(cls, df) -> List['AllocationByKR']:
         """Factory method để tạo list instances từ pandas DataFrame"""
         return [cls.from_bigquery_row(row) for _, row in df.iterrows()]
-    
+
     def __repr__(self) -> str:
         """String representation cho debugging"""
         return (f"AllocationByKR(from_type='{self.from_y_block_from_type}', to_type='{self.to_y_block_to_type}', "
@@ -683,9 +686,10 @@ class SoCell:
     prev_y_block_unit: Optional[str] = None
     prev_ppc: Optional[str] = None
     prev_value: Optional[float] = None
+    prev_np: Optional[str] = None
     by_block_bytype: Optional[str] = None
     by_block_bypercent: Optional[float] = None
-    
+
     @classmethod
     def from_bigquery_row(cls, row) -> 'SoCell':
         """Factory method để tạo instance từ BigQuery Row"""
@@ -693,7 +697,7 @@ class SoCell:
             data = dict(row.items())
         else:
             data = row
-            
+
         return cls(
             i_o=data.get('i_o'),
             z_block_zblock1_source=data.get('z_block_zblock1_source'),
@@ -801,15 +805,16 @@ class SoCell:
             prev_y_block_unit=data.get('prev_y_block_unit'),
             prev_ppc=data.get('prev_ppc'),
             prev_value=data.get('prev_value'),
+            prev_np=data.get('prev_np'),
             by_block_bytype=data.get('by_block_bytype'),
             by_block_bypercent=data.get('by_block_bypercent')
         )
-    
+
     @classmethod
     def from_dataframe(cls, df) -> List['SoCell']:
         """Factory method để tạo list instances từ pandas DataFrame"""
         return [cls.from_bigquery_row(row) for _, row in df.iterrows()]
-    
+
     def __repr__(self) -> str:
         """String representation cho debugging"""
         return (f"SoCellRawFull(fnf='{self.now_y_block_fnf_fnf}', "
@@ -876,7 +881,6 @@ YBLOCK_FIELD_MAPPING = {
     'to_y_block_unit': 'now_y_block_unit',
 }
 
-
 # YBLOCK Field Mapping: SoCell NowYBlock -> SoCell PrevYBlock
 PREV_YBLOCK_FIELD_MAPPING = {
     # FNF field
@@ -940,28 +944,29 @@ PREV_YBLOCK_FIELD_MAPPING = {
 }
 
 
-def build_so_cell_query(allocation_by_type_item: AllocationByType, project_id: str, dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
+def build_so_cell_query(allocation_by_type_item: AllocationByType, project_id: str, dataset_id: str = 'alloc_stage',
+                        table_id: str = 'so_cell_raw_full') -> str:
     """
     Build dynamic query cho SoCell dựa trên Y-block fields của AllocationByType
-    
+
     Args:
         allocation_by_type_item: Instance của AllocationByType
         project_id: Google Cloud Project ID
         dataset_id: Dataset ID (default: 'alloc_stage')
         table_id: Table ID (default: 'so_cell_raw_full')
-        
+
     Returns:
         SQL query string với WHERE conditions động
     """
     import pandas as pd
-    
+
     where_conditions = []
-    
+
     # Duyệt qua mapping và build WHERE conditions
     for by_type_field, so_cell_field in YBLOCK_FIELD_MAPPING.items():
         # Lấy giá trị từ AllocationByType instance
         value = getattr(allocation_by_type_item, by_type_field, None)
-        
+
         # Skip nếu value là None, pandas NA, NaN, hoặc empty string
         if value is None:
             continue
@@ -969,7 +974,7 @@ def build_so_cell_query(allocation_by_type_item: AllocationByType, project_id: s
             continue
         if isinstance(value, str) and value == '':
             continue
-            
+
         # Format value dựa trên type
         if isinstance(value, str):
             # Escape single quotes trong string
@@ -979,37 +984,43 @@ def build_so_cell_query(allocation_by_type_item: AllocationByType, project_id: s
             formatted_value = str(value)
         else:
             formatted_value = f"'{str(value)}'"
-        
+
         where_conditions.append(f"{so_cell_field} = {formatted_value}")
-    
+
     # Build query
     table_name = f"{project_id}.{dataset_id}.{table_id}"
     query = f"SELECT * FROM `{table_name}`"
-    
+
     if where_conditions:
         query += "\nWHERE " + "\nAND ".join(where_conditions)
-    
+
     return query
 
 
-def build_so_cell_by_kr_query(allocation_by_kr_item: AllocationByKR, allocation_to_item: AllocationToItem, project_id: str, dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
+def build_so_cell_by_kr_query(allocation_by_kr_item: AllocationByKR,
+                              allocation_to_item: AllocationToItem,
+                              project_id: str,
+                              to_item: str,
+                              dataset_id: str = 'alloc_stage',
+                              table_id: str = 'so_cell_raw_full',
+                              ) -> str:
     """
     Build dynamic query cho SoCell dựa trên Y-block fields từ AllocationByKR và AllocationToItem
-    
+
     Args:
         allocation_by_kr_item: Instance của AllocationByKR (kr_block_3)
         allocation_to_item: Instance của AllocationToItem (filter_block_3)
         project_id: Google Cloud Project ID
         dataset_id: Dataset ID (default: 'alloc_stage')
         table_id: Table ID (default: 'so_cell_raw_full')
-        
+
     Returns:
         SQL query string với WHERE conditions động
     """
     import pandas as pd
-    
+
     where_conditions = []
-    
+
     # Mapping từ AllocationByKR TO_Y_BLOCK fields sang SoCell now_y_block fields
     kr_to_socell_mapping = {
         'to_y_block_kr1': 'now_y_block_kr_item_code_kr1',
@@ -1054,11 +1065,11 @@ def build_so_cell_by_kr_query(allocation_by_kr_item: AllocationByKR, allocation_
         'to_y_block_le2': 'now_y_block_le_le2',
         'to_y_block_unit': 'now_y_block_unit',
     }
-    
+
     # Build conditions từ AllocationByKR
     for kr_field, socell_field in kr_to_socell_mapping.items():
         value = getattr(allocation_by_kr_item, kr_field, None)
-        
+
         # Skip nếu value là None, pandas NA, NaN, hoặc empty string
         if value is None:
             continue
@@ -1066,7 +1077,7 @@ def build_so_cell_by_kr_query(allocation_by_kr_item: AllocationByKR, allocation_
             continue
         if isinstance(value, str) and value == '':
             continue
-            
+
         # Format value dựa trên type
         if isinstance(value, str):
             escaped_value = value.replace("'", "\\'")
@@ -1075,23 +1086,25 @@ def build_so_cell_by_kr_query(allocation_by_kr_item: AllocationByKR, allocation_
             formatted_value = str(value)
         else:
             formatted_value = f"'{str(value)}'"
-        
+
         where_conditions.append(f"{socell_field} = {formatted_value}")
-    
+
+    where_conditions.append(f"now_y_block_period_mx = '{to_item}'")
     # Build query
     table_name = f"{project_id}.{dataset_id}.{table_id}"
     query = f"SELECT * FROM `{table_name}`"
-    
+
     if where_conditions:
         query += "\nWHERE " + "\nAND ".join(where_conditions)
-    
+
     return query
 
 
-def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, project_id: str, dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
+def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, project_id: str,
+                             dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
     """
     Build dynamic query cho SoCell dựa trên PrevYBlock matching với NowYBlock của y_block_1
-    
+
     Args:
         y_block_1: SoCell instance có NowYBlock cần match với PrevYBlock
         x_period_1: XPeriod value (now_np)
@@ -1099,19 +1112,19 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
         project_id: Google Cloud Project ID
         dataset_id: Dataset ID (default: 'alloc_stage')
         table_id: Table ID (default: 'so_cell_raw_full')
-        
+
     Returns:
         SQL query string với WHERE conditions động
     """
     import pandas as pd
-    
+
     where_conditions = []
-    
+
     # Duyệt qua mapping và build WHERE conditions cho PrevYBlock
     for now_field, prev_field in PREV_YBLOCK_FIELD_MAPPING.items():
         # Lấy giá trị từ NowYBlock của y_block_1
         value = getattr(y_block_1, now_field, None)
-        
+
         # Skip nếu value là None, pandas NA, NaN, hoặc empty string
         if value is None:
             continue
@@ -1119,7 +1132,7 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
             continue
         if isinstance(value, str) and value == '':
             continue
-            
+
         # Format value dựa trên type
         if isinstance(value, str):
             # Escape single quotes trong string
@@ -1129,10 +1142,10 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
             formatted_value = str(value)
         else:
             formatted_value = f"'{str(value)}'"
-        
+
         # Add condition cho PrevYBlock field
         where_conditions.append(f"{prev_field} = {formatted_value}")
-    
+
     # Add XPeriod condition (now_np)
     if x_period_1 is not None and not pd.isna(x_period_1):
         if isinstance(x_period_1, str):
@@ -1140,29 +1153,30 @@ def build_so_cell_prev_query(y_block_1: SoCell, x_period_1: str, z_number: int, 
             where_conditions.append(f"now_np = '{escaped_x_period}'")
         else:
             where_conditions.append(f"now_np = {x_period_1}")
-    
+
     # Add ZNumber condition (from z_block)
     if z_number is not None:
         where_conditions.append(f"now_zblock2_alt = '{z_number}'")
-    
+
     # Build query
     table_name = f"{project_id}.{dataset_id}.{table_id}"
     query = f"SELECT * FROM `{table_name}`"
-    
+
     if where_conditions:
         query += "\nWHERE " + "\nAND ".join(where_conditions)
-    
+
     return query
 
 
 def create_socell_from_yblocks(
-    y_block_2: 'SoCell',
-    y_block_1: 'SoCell',
-    x_period_1: str,
-    value_2: float,
-    value_1: float,
-    by_type: str,
-    by_percent: float
+        y_block_2: 'SoCell',
+        y_block_1: 'SoCell',
+        x_period_1: str,
+        value_2: float,
+        value_1: float,
+        by_type: str,
+        by_percent: float,
+        to_alt: str
 ) -> 'SoCell':
     return SoCell(
         # NowYBlock = NowYBlock2
@@ -1212,9 +1226,9 @@ def create_socell_from_yblocks(
         # NowXPeriod=x_period_1
         now_np=y_block_2.now_np,
 
-        #NowValue = NowValue2
+        # NowValue = NowValue2
         now_value=value_2,
-        
+
         # PrevYBlock = NowYBlock1
         prev_y_block_kr_item_code_kr1=y_block_1.now_y_block_kr_item_code_kr1,
         prev_y_block_kr_item_code_kr2=y_block_1.now_y_block_kr_item_code_kr2,
@@ -1260,21 +1274,21 @@ def create_socell_from_yblocks(
         prev_y_block_kr_item_name=y_block_1.now_y_block_kr_item_name,
 
         # PrevXPeriod=x_period_1)
-        #Buglist2
+        # Buglist2
         prev_y_block_period_np=x_period_1,
 
         # PrevValue=NowValue1
         prev_value=value_1,
 
-        
         # ByType = ByType
         by_block_bytype=by_type,
 
-        #ByPercent
+        # ByPercent
         by_block_bypercent=by_percent,
 
-
-        now_zblock2_alt=y_block_1.now_zblock2_alt,
+        now_zblock2_alt=to_alt,
+        prev_zblock2_alt=y_block_1.now_zblock2_alt,
+        prev_np=x_period_1
     )
 
 
@@ -1323,17 +1337,17 @@ def add_period_strings(base_period: str, offset_period: str) -> str:
 
 
 def create_socell_for_offset(
-    y_block_1: 'SoCell',
-    to_alt: str,
-    x_period_2: str,
-    x_period_1: str,
-    value_1: float,
-    by_type: str,
-    z_number: int
+        y_block_1: 'SoCell',
+        to_alt: str,
+        x_period_2: str,
+        x_period_1: str,
+        value_1: float,
+        by_type: str,
+        z_number: int
 ) -> 'SoCell':
     """
     Tạo SoCell instance cho trường hợp offset (NowYBlock = PrevYBlock = YBlock1)
-    
+
     Args:
         y_block_1: SoCell instance (YBlock1)
         to_alt: MyToALT
@@ -1342,7 +1356,7 @@ def create_socell_for_offset(
         value_1: Value1
         by_type: MyAllocationByTypeItem.ByType
         z_number: MyAllocationALTItem.ZNumber
-    
+
     Returns:
         SoCell instance mới
     """
@@ -1389,16 +1403,16 @@ def create_socell_for_offset(
         now_y_block_le_le1=y_block_1.now_y_block_le_le1,
         now_y_block_le_le2=y_block_1.now_y_block_le_le2,
         now_y_block_unit=y_block_1.now_y_block_unit,
-        
+
         # NowALT = MyToALT
         now_zblock2_alt=to_alt,
-        
+
         # NowXPeriod = XPeriod2
         now_np=x_period_2,
-        
+
         # NowValue = Value1
         now_value=value_1,
-        
+
         # PrevYBlock = YBlock1 (same as NowYBlock)
         prev_y_block_kr_item_code_kr1=y_block_1.now_y_block_kr_item_code_kr1,
         prev_y_block_kr_item_code_kr2=y_block_1.now_y_block_kr_item_code_kr2,
@@ -1440,34 +1454,34 @@ def create_socell_for_offset(
         prev_y_block_le_le1=y_block_1.now_y_block_le_le1,
         prev_y_block_le_le2=y_block_1.now_y_block_le_le2,
         prev_y_block_unit=y_block_1.now_y_block_unit,
-        
+
         # PrevXPeriod = XPeriod1
         prev_ppc=x_period_1,
-        
+
         # PrevValue = Value1
         prev_value=value_1,
-        
+
         # ByType = MyAllocationByTypeItem.ByType
         by_block_bytype=by_type,
-        
+
         # ZNumber (for reference, though not directly in SoCell schema based on previous code)
         # Note: If z_number is needed, it should be added to appropriate z_block fields
     )
 
 
 def calculate_offset(
-    bq: 'BigQueryConnector',
-    my_allocation_by_type_item: 'AllocationByType',
-    my_allocation_alt_item: 'AllocationALT',
-    y_block_1: 'SoCell',
-    x_period_1: str,
-    value_1: float,
-    alloc_data_dataset_name: str,
-    so_cell_table_name: str
+        bq: 'BigQueryConnector',
+        my_allocation_by_type_item: 'AllocationByType',
+        my_allocation_alt_item: 'AllocationALT',
+        y_block_1: 'SoCell',
+        x_period_1: str,
+        value_1: float,
+        alloc_data_dataset_name: str,
+        so_cell_table_name: str
 ) -> bool:
     """
     Xử lý trường hợp offset: tính x_period_2, tạo SoCell và insert vào BigQuery
-    
+
     Args:
         bq: BigQueryConnector instance
         my_allocation_by_type_item: AllocationByType item chứa offset trong by_block_by_type
@@ -1477,19 +1491,19 @@ def calculate_offset(
         value_1: Value1
         alloc_data_dataset_name: Dataset name
         so_cell_table_name: Table name
-    
+
     Returns:
         True nếu insert thành công, False nếu thất bại
     """
     # Convert string to int offset
     # OffsetMonth = TextToNum(MyAllocationByTypeItem.ByType)
     offset_month = int(my_allocation_by_type_item.by_block_by_type)
-    
+
     # Calculate x_period_2 from x_period_1 and offset
     # XPeriod2 = ShiftMonth(XPeriod1, OffsetMonth)
     x_period_2 = add_period_with_offset(x_period_1, offset_month)
     print(f"[INFO] Offset case: offset={offset_month}, x_period_1={x_period_1}, x_period_2={x_period_2}")
-    
+
     # Create SoCell for offset case
     # Insert SOCell:
     # NowYBlock = YBlock1, NowALT = MyToALT, NowXPeriod = Xperiod2, NowValue = Value1
@@ -1504,33 +1518,33 @@ def calculate_offset(
         by_type=my_allocation_by_type_item.by_block_by_type,
         z_number=my_allocation_alt_item.z_number
     )
-    
+
     # Insert to BigQuery
     success = bq.insert_row(
         dataset_id=alloc_data_dataset_name,
         table_id=so_cell_table_name,
         row_data=insert_so_cell_offset
     )
-    
+
     if success:
         print(f"[INFO] Offset case: Successfully inserted SoCell with x_period_2={x_period_2}")
     else:
         print(f"[ERROR] Offset case: Failed to insert SoCell")
-    
+
     return success
 
 
 def add_period_with_offset(base_period: str, offset: int) -> str:
     """
     Tính toán period mới dựa trên base_period và offset (có thể dương hoặc âm).
-    
+
     Args:
         base_period: Chuỗi dạng "M2501" (tháng 1 năm 2025)
         offset: Số tháng cần cộng/trừ (dương = tịnh tiến, âm = lùi)
-    
+
     Returns:
         Chuỗi kết quả dạng "M2502" hoặc "M2412"
-    
+
     Example:
         >>> add_period_with_offset("M2501", 1)
         "M2502"
@@ -1542,116 +1556,22 @@ def add_period_with_offset(base_period: str, offset: int) -> str:
     # Parse base_period: M2501 -> year=2025, month=1
     if not base_period or len(base_period) < 5 or base_period[0] != 'M':
         raise ValueError(f"Invalid base_period format: {base_period}. Expected format: M2501")
-    
+
     year_str = base_period[1:3]  # "25"
     month_str = base_period[3:5]  # "01"
     base_year = 2000 + int(year_str)  # 2025
     base_month = int(month_str)  # 1
-    
+
     # Calculate new month and year with offset
     total_months = (base_year * 12 + base_month) + offset
     new_year = (total_months - 1) // 12
     new_month = ((total_months - 1) % 12) + 1
-    
+
     # Format result: M2502
     year_suffix = str(new_year)[-2:]  # "25" or "24"
     result = f"M{year_suffix}{new_month:02d}"
-    
+
     return result
-
-
-def preload_all_data(bq, project_id, allocation_config_dataset_name, allocation_to_item_table_name, allocation_by_kr_table_name):
-    """
-    Pre-load tất cả dữ liệu cần thiết từ BigQuery để tránh query trong vòng lặp.
-    Tạo các index/dictionary để tra cứu nhanh O(1).
-    """
-    print("[INFO] Pre-loading all data...")
-    
-    # Load AllocationToItem
-    query_all_to_items = f"""
-    SELECT * FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}`
-    """
-    all_to_items_df = bq.execute_query(query_all_to_items)
-    all_to_items = AllocationToItem.from_dataframe(all_to_items_df)
-    
-    # Index by to_type
-    to_items_by_type = {}
-    for item in all_to_items:
-        if item.to_type not in to_items_by_type:
-            to_items_by_type[item.to_type] = []
-        to_items_by_type[item.to_type].append(item)
-    
-    # Load AllocationByKR
-    query_all_by_kr = f"""
-    SELECT * FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}`
-    """
-    all_by_kr_df = bq.execute_query(query_all_by_kr)
-    all_by_kr = AllocationByKR.from_dataframe(all_by_kr_df)
-    
-    # Index by (kr6, kr4, by_type)
-    by_kr_index = {}
-    for item in all_by_kr:
-        key = (item.to_y_block_kr6, item.to_y_block_kr4, item.by_block_by_type)
-        by_kr_index[key] = item
-    
-    # Load PT-S2, CTY-S2, NP-D365 items for ByAgg
-    pt_s2_items = [str(item.to_item) for item in all_to_items if item.to_type == 'PT-S2' and item.to_item is not None]
-    cty_s2_items = [str(item.to_item) for item in all_to_items if item.to_type == 'CTY-S2' and item.to_item is not None]
-    np_d365_items = [str(item.to_item) for item in all_to_items if item.to_type == 'NP-D365' and item.to_item is not None]
-    
-    print(f"[INFO] Pre-loaded: {len(all_to_items)} to_items, {len(all_by_kr)} by_kr items")
-    print(f"[INFO] Indexed: {len(to_items_by_type)} to_type groups, {len(by_kr_index)} by_kr combinations")
-    
-    return {
-        'to_items_by_type': to_items_by_type,
-        'by_kr_index': by_kr_index,
-        'pt_s2_items': pt_s2_items,
-        'cty_s2_items': cty_s2_items,
-        'np_d365_items': np_d365_items
-    }
-
-
-def batch_insert_rows(bq, dataset_id, table_id, rows):
-    """
-    Batch insert nhiều rows cùng lúc để giảm số lần gọi API.
-    """
-    if not rows:
-        return True
-    
-    from decimal import Decimal
-    
-    table_ref = f"{bq.client.project}.{dataset_id}.{table_id}"
-    table = bq.client.get_table(table_ref)
-    
-    def convert_decimals(obj):
-        if isinstance(obj, dict):
-            return {k: convert_decimals(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [convert_decimals(item) for item in obj]
-        elif isinstance(obj, Decimal):
-            return round(float(obj), 9)
-        elif isinstance(obj, float):
-            return round(obj, 9)
-        else:
-            return obj
-    
-    rows_to_insert = []
-    for row_data in rows:
-        if hasattr(row_data, '__dataclass_fields__'):
-            from dataclasses import asdict
-            row_dict = asdict(row_data)
-        else:
-            row_dict = row_data
-        rows_to_insert.append(convert_decimals(row_dict))
-    
-    errors = bq.client.insert_rows_json(table, rows_to_insert)
-    
-    if errors:
-        print(f"✗ Errors occurred while batch inserting {len(rows)} rows: {errors}")
-        return False
-    else:
-        print(f"✓ Successfully batch inserted {len(rows)} rows into {table_ref}")
-        return True
 
 
 def main():
@@ -1659,32 +1579,26 @@ def main():
     # credentials_path = "/home/tunk/Desktop/foxlearning-6ddb4fb2192a.json"
     credentials_path = "/home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json"
     project_id = "fp-a-project"
-    
+
     # Dataset names
     allocation_config_dataset_name = "allocation_config"
     alloc_data_dataset_name = "alloc_stage"
-    
+
     # Table names
     allocation_alt_table_name = "AllocationALT_NativeTable"
     allocation_to_item_table_name = "AllocationToItem_NativeTable"
     allocation_by_type_table_name = "AllocationByType_NativeTable"
     allocation_by_kr_table_name = "AllocationByKR_NativeTable"
     so_cell_table_name = "so_cell_raw_full"
-    
+
     try:
         # Khởi tạo connector
         bq = BigQueryConnector(
             credentials_path=credentials_path,
             project_id=project_id
         )
-        
-        # Pre-load tất cả dữ liệu cần thiết
-        preloaded_data = preload_all_data(
-            bq, project_id, allocation_config_dataset_name, 
-            allocation_to_item_table_name, allocation_by_kr_table_name
-        )
-        
-        #Step20 Query from AllocationALT: MyAllocationALTItem (N)
+
+        # Step20 Query from AllocationALT: MyAllocationALTItem (N)
         query = f"""
         SELECT
             ZNumber,
@@ -1700,21 +1614,28 @@ def main():
 
         print(f"[INFO][Step 20] We having {len(my_allocation_alt_items)} my_allocation_alt_items by query: \n {query}")
 
-        #Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
+        # Step30 Foreach MyAllocationALTItem (ZNumber, MyFromALT, MyToALT, MyFromType, MyToType) (ZNumber INCREASING)
         for my_allocation_alt_item in my_allocation_alt_items:
             # TODO remove it to calculate all
             if my_allocation_alt_item.z_number != 422:
-                print(f"[WARN][Step 30] Skip process my_allocation_alt_item: {my_allocation_alt_item} because z_number is not equal 422 for testing purpose, remove it when calculating in production mode")
+                print(
+                    f"[WARN][Step 30] Skip process my_allocation_alt_item: {my_allocation_alt_item} because z_number is not equal 422 for testing purpose, remove it when calculating in production mode")
                 continue
             print(f"[INFO][Step 30] Start process each my_allocation_alt_item: {my_allocation_alt_item}")
-            #Step35 Query from AllocationToItem: (MyFromType) -> MyFromItemAllowed (N) // PT0 -> "Null"; PT1 -> Game, Util, Productivity...
-            #Step40 Query from AllocationToItem: (MyToType) -> MyToItem (N)
-            # Sử dụng pre-loaded data thay vì query
-            my_to_items = preloaded_data['to_items_by_type'].get(my_allocation_alt_item.to_type, [])
+            # Step35 Query from AllocationToItem: (MyFromType) -> MyFromItemAllowed (N) // PT0 -> "Null"; PT1 -> Game, Util, Productivity...
+            # Step40 Query from AllocationToItem: (MyToType) -> MyToItem (N)
+            # Query AllocationToItem dựa trên to_type của allocation
+            query_to_item = f"""
+            SELECT * 
+            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+            WHERE TO_Y_BLOCK_ToType = "{my_allocation_alt_item.to_type}"
+            """
+            my_to_items_raw = bq.execute_query(query_to_item)
+            my_to_items = AllocationToItem.from_dataframe(my_to_items_raw)
 
-            print(f"[INFO][Step 40] We having {len(my_to_items)} my_to_items from pre-loaded data for to_type={my_allocation_alt_item.to_type}")
+            print(f"[INFO][Step 40] We having {len(my_to_items)} my_to_items by query: \n {query_to_item}")
 
-            #Step50 Query from AllocationByType: (ZNumber) -> MyAllocationByTypeItem (YNumber, Y-Block, MyByType) (N)
+            # Step50 Query from AllocationByType: (ZNumber) -> MyAllocationByTypeItem (YNumber, Y-Block, MyByType) (N)
             # Query AllocationByType dựa trên z_number của allocation
             query_by_type = f"""
             SELECT * 
@@ -1722,32 +1643,56 @@ def main():
             WHERE ZNumber = {my_allocation_alt_item.z_number}
             ORDER BY YNumber DESC
             """
-            
+
             my_by_type_raw = bq.execute_query(query_by_type)
-            
+
             # Chuyển đổi sang list of AllocationByType objects
             my_allocation_by_type_items = AllocationByType.from_dataframe(my_by_type_raw)
-            
-            print(f"[INFO][Step 50] We having {len(my_allocation_by_type_items)} my_allocation_by_type_items by query: \n {query_by_type}")
 
-            #Step60 Foreach MyAllocationByTypeItem (YNumber DECREASING):
+            print(
+                f"[INFO][Step 50] We having {len(my_allocation_by_type_items)} my_allocation_by_type_items by query: \n {query_by_type}")
+
+            # Step60 Foreach MyAllocationByTypeItem (YNumber DECREASING):
             for my_allocation_by_type_item in my_allocation_by_type_items:
                 print(f"[INFO][Step 60] Processing for each my_allocation_by_type_item: {my_allocation_by_type_item}")
 
                 if my_allocation_by_type_item.by_block_by_type == 'GAgg':
-                    print("INFO][Step 60] Ignore process for this my_allocation_by_type_item because by type is GAgg or ByAgg")
+                    print(
+                        "INFO][Step 60] Ignore process for this my_allocation_by_type_item because by type is GAgg or ByAgg")
                     continue
 
                 if my_allocation_by_type_item.by_block_by_type == 'ByAgg':
-                    # Sử dụng pre-loaded data thay vì query
-                    pt_s2_items = preloaded_data['pt_s2_items']
-                    cty_s2_items = preloaded_data['cty_s2_items']
-                    np_d365_items = preloaded_data['np_d365_items']
-                    
-                    print(f"[INFO][Step 60] ByAgg case: Using pre-loaded PT-S2({len(pt_s2_items)}), CTY-S2({len(cty_s2_items)}), NP-D365({len(np_d365_items)})")
-                    
-                    # Batch collect all inserts
-                    byagg_inserts = []
+                    # Query AllocationToItem for ByAgg case
+                    query_pt_s2 = f"""
+                    SELECT TO_Y_BLOCK_ToItem 
+                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+                    WHERE TO_Y_BLOCK_ToType = 'PT-S2'
+                    """
+                    pt_s2_raw = bq.execute_query(query_pt_s2)
+
+                    pt_s2_items = [
+                        str(item) for item in pt_s2_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
+                    ]
+
+                    query_cty_s2 = f"""
+                                        SELECT TO_Y_BLOCK_ToItem 
+                                        FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+                                        WHERE TO_Y_BLOCK_ToType = 'CTY-S2'
+                                        """
+                    cty_s2_raw = bq.execute_query(query_cty_s2)
+                    cty_s2_items = [
+                        str(item) for item in cty_s2_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
+                    ]
+
+                    query_np_d365 = f"""
+                                                            SELECT TO_Y_BLOCK_ToItem 
+                                                            FROM `{project_id}.{allocation_config_dataset_name}.{allocation_to_item_table_name}` 
+                                                            WHERE TO_Y_BLOCK_ToType = 'NP-D365'
+                                                            """
+                    np_d365_raw = bq.execute_query(query_np_d365)
+                    np_d365_items = [
+                        str(item) for item in np_d365_raw['TO_Y_BLOCK_ToItem'].dropna().tolist()
+                    ]
                     for my_to_item_pts2 in pt_s2_items:
                         for my_to_item_ctys2 in cty_s2_items:
                             for my_to_item_np_d365 in np_d365_items:
@@ -1784,11 +1729,11 @@ def main():
                                 # Parse my_to_item_pts2 to get pt1 and pt2
                                 pt1 = my_to_item_pts2[:2] if len(my_to_item_pts2) >= 2 else my_to_item_pts2
                                 pt2 = my_to_item_pts2[2:] if len(my_to_item_pts2) > 2 else None
-                                
+
                                 # Parse my_to_item_ctys2 to get cty1 and cty2
                                 cty1 = my_to_item_ctys2[:2] if len(my_to_item_ctys2) >= 2 else my_to_item_ctys2
                                 cty2 = my_to_item_ctys2[2:] if len(my_to_item_ctys2) > 2 else None
-                                
+
                                 # Create SoCell for ByAgg aggregation
                                 insert_so_cell_byagg = SoCell(
                                     # KR fields as specified
@@ -1801,13 +1746,13 @@ def main():
                                     now_y_block_kr_item_code_kr6=None,
                                     now_y_block_kr_item_code_kr7=None,
                                     now_y_block_kr_item_code_kr8=None,
-                                    
+
                                     # CDT = Null
                                     now_y_block_cdt_cdt1=None,
                                     now_y_block_cdt_cdt2=None,
                                     now_y_block_cdt_cdt3=None,
                                     now_y_block_cdt_cdt4=None,
-                                    
+
                                     # PT fields from my_to_item_pts2
                                     now_y_block_ptnow_pt1=pt1,
                                     now_y_block_ptnow_pt2=pt2,
@@ -1817,12 +1762,12 @@ def main():
                                     now_y_block_ptprev_duration=None,
                                     now_y_block_ptfix_owntype=None,
                                     now_y_block_ptfix_aitype=None,
-                                    
+
                                     # CTY fields from my_to_item_ctys2
                                     now_y_block_ptsub_cty1=cty1,
                                     now_y_block_ptsub_cty2=cty2,
                                     now_y_block_ptsub_ostype=None,
-                                    
+
                                     # Other fields
                                     now_y_block_funnel_fu1=None,
                                     now_y_block_funnel_fu2=None,
@@ -1842,13 +1787,13 @@ def main():
                                     now_y_block_le_le1=None,
                                     now_y_block_le_le2=None,
                                     now_y_block_unit=None,
-                                    
+
                                     # NP from my_to_item_np_d365
                                     now_np=my_to_item_np_d365,
-                                    
+
                                     # NowValue = Value2 (sum of all values)
                                     now_value=value_2,
-                                    
+
                                     # Prev fields = None
                                     prev_y_block_kr_item_code_kr1=None,
                                     prev_y_block_kr_item_code_kr2=None,
@@ -1892,57 +1837,57 @@ def main():
                                     prev_y_block_unit=None,
                                     prev_ppc=None,
                                     prev_value=None,
-                                    
+
                                     # By fields
                                     by_block_bytype='ByAgg',
                                     by_block_bypercent=None
                                 )
-                                
-                                # Collect for batch insert
-                                byagg_inserts.append(insert_so_cell_byagg)
-                                print(f"[INFO] ByAgg: Prepared SoCell with value={value_2}, PTS2={my_to_item_pts2}, CTYS2={my_to_item_ctys2}, NPD365={my_to_item_np_d365}")
-                    
-                    # Batch insert all ByAgg records
-                    if byagg_inserts:
-                        success = batch_insert_rows(bq, alloc_data_dataset_name, so_cell_table_name, byagg_inserts)
-                        if success:
-                            print(f"[INFO] ByAgg: Successfully batch inserted {len(byagg_inserts)} SoCells")
-                        else:
-                            print(f"[ERROR] ByAgg: Failed to batch insert SoCells")
+
+                                # Insert to BigQuery
+                                success = bq.insert_row(
+                                    dataset_id=alloc_data_dataset_name,
+                                    table_id=so_cell_table_name,
+                                    row_data=insert_so_cell_byagg
+                                )
+                                if success:
+                                    print(
+                                        f"[INFO] ByAgg: Successfully inserted aggregated SoCell with value={value_2}, PTS2={my_to_item_pts2}, CTYS2={my_to_item_ctys2}, NPD365={my_to_item_np_d365}")
+                                else:
+                                    print(f"[ERROR] ByAgg: Failed to insert aggregated SoCell")
+
                     continue
 
-                #ELSECASE các loại Allocate ByXXX thông thường, Offset(ByType=Number), GAgg(aggregate bằng Gsheet, không cần code)
-                #Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
-                #Mapping each yblock from by_type to so_cell
-                #Build dynamic query base on the Y-block fields of my_allocation_by_type_item
+                # ELSECASE các loại Allocate ByXXX thông thường, Offset(ByType=Number), GAgg(aggregate bằng Gsheet, không cần code)
+                # Step70 Query from SOCell: (MyAllocationByTypeItem.Y-Block, XPeriod, Z-Block) -> FromSOCellItem (N)
+                # Mapping each yblock from by_type to so_cell
+                # Build dynamic query base on the Y-block fields of my_allocation_by_type_item
                 query_so_cell = build_so_cell_query(
-                    my_allocation_by_type_item, 
+                    my_allocation_by_type_item,
                     project_id,
-                    dataset_id=alloc_data_dataset_name, 
+                    dataset_id=alloc_data_dataset_name,
                     table_id=so_cell_table_name
                 )
                 my_so_cell_raw = bq.execute_query(query_so_cell)
 
                 # Chuyển đổi sang list of SoCellRawFull objects
                 from_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
-                print(f"[INFO][Step 70] We having {len(from_so_cell_items)} from_so_cell_items by query: \n {query_so_cell}")
+                print(
+                    f"[INFO][Step 70] We having {len(from_so_cell_items)} from_so_cell_items by query: \n {query_so_cell}")
 
-                # Batch collect all inserts for this by_type_item
-                batch_inserts = []
-                
-                #Step80 Foreach FromSOCelItem(N)
+                # Step80 Foreach FromSOCelItem(N)
                 for from_so_cell_item in from_so_cell_items:
                     # Step90 (YBlock1, XPeriod1, Value1) = FromSOCelItem(NowYBlock, XPeriod, NowValue)
                     print(f"[INFO][Step 80] Start processing for each from_so_cell_item: {from_so_cell_item}")
                     y_block_1 = from_so_cell_item
                     x_period_1 = from_so_cell_item.now_np
                     value_1 = from_so_cell_item.now_value
-                    print(f"[INFO][Step 80] We have y_block_1: {y_block_1}, x_period_1: {x_period_1}, value_1: {value_1}")
+                    print(
+                        f"[INFO][Step 80] We have y_block_1: {y_block_1}, x_period_1: {x_period_1}, value_1: {value_1}")
                     # Step100 MyFromItem = GetItem (YBlock1, MyFromType)
                     # Tam thoi skip Step100
-                    #Step110 Query from SOCell: 
-                    # (SOCellItem.PrevYBlock = YBlock1 
-                    # AND SOCellItem.XPeriod = XPeriod1 
+                    # Step110 Query from SOCell:
+                    # (SOCellItem.PrevYBlock = YBlock1
+                    # AND SOCellItem.XPeriod = XPeriod1
                     # AND SOCellItem.ZNumber = MyAllocationALTItem.ZNumber) (N)
                     # Build query động cho PrevYBlock
                     query_so_cell_prev = build_so_cell_prev_query(
@@ -1956,15 +1901,17 @@ def main():
                     # Execute query
                     so_cell_raw = bq.execute_query(query_so_cell_prev)
                     so_cells_prev_y_block = SoCell.from_dataframe(so_cell_raw)
-                    print(f"[INFO][Step 110] We having {len(so_cells_prev_y_block)} so_cells_prev_y_block by query: \n {query_so_cell_prev}")
+                    print(
+                        f"[INFO][Step 110] We having {len(so_cells_prev_y_block)} so_cells_prev_y_block by query: \n {query_so_cell_prev}")
 
-                    #Step120 If (N = 0)
+                    # Step120 If (N = 0)
                     if len(so_cells_prev_y_block) > 0:
                         print("[WARN][Step 120] Skip process because so_cells_prev_y_block is empty (N=0)")
                         continue
 
                     # CASE MyAllocationByTypeItem.ByType = Number // Offset
-                    if my_allocation_by_type_item.by_block_by_type and str(my_allocation_by_type_item.by_block_by_type).lstrip('-').isdigit():
+                    if my_allocation_by_type_item.by_block_by_type and str(
+                            my_allocation_by_type_item.by_block_by_type).lstrip('-').isdigit():
                         # Call calculate_offset function
                         calculate_offset(
                             bq=bq,
@@ -1979,69 +1926,87 @@ def main():
                         continue
 
                     # ELSECASE // các loại Allocation ByXXX thông thường
-                    #Step120 Start allocating
-                    # Sử dụng pre-loaded index thay vì query
+                    # Step120 Start allocating
+                    # Query AllocationByKR: WHERE TO_Y_BLOCK_KR6 = MyFromType
+                    # AND TO_Y_BLOCK_KR4 = MyToType
+                    # AND BY_BLOCK_ByType = MyByType
                     my_from_type = my_allocation_alt_item.from_type  # MyFromType
-                    my_to_type = my_allocation_alt_item.to_type      # MyToType
+                    my_to_type = my_allocation_alt_item.to_type  # MyToType
                     my_by_type = my_allocation_by_type_item.by_block_by_type  # MyByType
-                    
-                    # Tra cứu O(1) từ index
-                    key = (my_from_type, my_to_type, my_by_type)
-                    allocation_by_kr_item = preloaded_data['by_kr_index'].get(key)
-                    
-                    if not allocation_by_kr_item:
-                        print(f"[WARN] No allocation_by_kr_item found for key={key}")
+
+                    query_allocation_by_kr = f"""
+                    SELECT * 
+                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}` 
+                    WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
+                    AND TO_Y_BLOCK_KR4 = '{my_to_type}'
+                    AND BY_BLOCK_ByType = '{my_by_type}'
+                    """
+                    allocation_by_kr_raw = bq.execute_query(query_allocation_by_kr)
+                    allocation_by_kr_items = AllocationByKR.from_dataframe(allocation_by_kr_raw)
+
+                    print(
+                        f"[INFO] We having {len(allocation_by_kr_items)} allocation_by_kr_items by query: \n {query_allocation_by_kr}")
+
+                    if len(allocation_by_kr_items) < 0:
+                        print("[WARN] Skip process because allocation_by_kr_items is empty")
                         continue
-                    
-                    print(f"[INFO] Found allocation_by_kr_item from pre-loaded index: {allocation_by_kr_item}")
-                    #Step130
+                    allocation_by_kr_item = allocation_by_kr_items[0]
+                    print(
+                        f"[INFO] We have allocation_by_kr_item by picking the first element of allocation_by_kr_items: {allocation_by_kr_item}")
+                    # Step130
                     # KRBlock3 = BY_BLOCK_ByType & "-TO-" & TO_Y_BLOCK_KR4 & "-FROM-" & TO_Y_BLOCK_KR6
                     # kr_block_3 = allocation_by_kr_item.by_block_by_type + "-TO-" + allocation_by_kr_item.to_y_block_kr4 + "-FROM-" + allocation_by_kr_item.to_y_block_kr6
                     kr_block_3 = allocation_by_kr_item
-                    #Step140 Foreach MyToItem (N)
+                    # Step140 Foreach MyToItem (N)
                     for my_to_item in my_to_items:
                         print(f"[INFO] Start processing for each my_to_item: {my_to_item}")
-                        
-                        #Step150 FilterBlock3 = MyToItem Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
+
+                        # Step150 FilterBlock3 = MyToItem Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
                         filter_block_3 = my_to_item
-                        #Step170 Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
+                        # Step170 Query SoCell based on y_block_3 (kr_block_3 + filter_block_3)
+                        # ByPercent = (Query
+                        #              from SOCell: XPeriod, YBlock3, now_y_block_period_mx = MyToItem -> BySOCell.NowValue)
                         by_percent_query = build_so_cell_by_kr_query(
                             allocation_by_kr_item=kr_block_3,
                             allocation_to_item=filter_block_3,
                             project_id=project_id,
+                            to_item=my_to_item.to_item,
                             dataset_id=alloc_data_dataset_name,
                             table_id=so_cell_table_name
                         )
                         # Execute query
                         by_percent_result_raw = bq.execute_query(by_percent_query)
                         by_percent_items = SoCell.from_dataframe(by_percent_result_raw)
-                        print(f"[INFO][Step 170] We having {len(by_percent_items)} by_percent by query: \n {by_percent_query}")
-                        if len(by_percent_items) < 0:
+                        print(
+                            f"[INFO][Step 170] We having {len(by_percent_items)} by_percent by query: \n {by_percent_query}")
+                        if len(by_percent_items) == 0:
                             print("[WARN][Step 170] Skip process because by_percent_items is empty")
                             continue
                         by_percent = by_percent_items[0].now_value
-                        print(f"[INFO][Step 170] We have by_percent: \n {by_percent} \n by kr_block_3: {kr_block_3} and filter_block_3: {filter_block_3}")
-                        #Step180 Value2 = Value1 * ByPercent
+                        if by_percent is None:
+                            continue
+                        print(
+                            f"[INFO][Step 170] We have by_percent: \n {by_percent} \n by kr_block_3: {kr_block_3} and filter_block_3: {filter_block_3}")
+                        # Step180 Value2 = Value1 * ByPercent
                         value_2 = value_1 * by_percent
-                        #Step190 IF MyFromType = NP
+                        # Step190 IF MyFromType = NP
                         if my_from_type == 'NP':
-                            #Step200 MyToTypeFinal = NP
+                            # Step200 MyToTypeFinal = NP
                             my_to_type_final = 'NP'
-                            #Step210 MyToItemFinal = x_period_1 + MyToItem , example M2601 = M2512 + MP01.
+                            # Step210 MyToItemFinal = x_period_1 + MyToItem , example M2601 = M2512 + MP01.
                             my_to_item_final = add_period_strings(x_period_1, my_to_item.to_item)
-                            #Step215 YBlock2 = YBlock1 (create independent copy)
+                            # Step215 YBlock2 = YBlock1 (create independent copy)
                             y_block_2 = copy.copy(y_block_1)
-                            #Step220 YBlock2.PPC = x_period_1; YBlock2.NP = MyToItemFinal
+                            # Step220 YBlock2.PPC = x_period_1; YBlock2.NP = MyToItemFinal
                             y_block_2.prev_ppc = x_period_1
                             y_block_2.now_np = my_to_item_final
 
-                            #Step230 Create SoCell instance
+                            # Step230 Create SoCell instance
                             # Insert to ToSoCell:
                             # (NowYBlock = NowYBlock2, NowXPeriod = MyXPeriod, NowValue = NowValue2;
                             # PrevYBlock = NowYBlock1, PrevXPeriod = MyXPeriod, PrevValue = NowValue1;
                             # ByType = ByType, ByPercent = ByPercent)
                             # now_zblock2_alt?
-
                             insert_so_cell = create_socell_from_yblocks(
                                 y_block_2=y_block_2,
                                 y_block_1=y_block_1,
@@ -2049,22 +2014,22 @@ def main():
                                 value_2=value_2,
                                 value_1=value_1,
                                 by_type=my_by_type,
-                                by_percent=by_percent
+                                by_percent=by_percent,
+                                to_alt=my_allocation_alt_item.to_alt
                             )
-                            
-                            # Collect for batch insert
-                            batch_inserts.append(insert_so_cell)
-                            print(f"[INFO][Step 230] Prepared SoCell for batch insert: {insert_so_cell}")
-                
-                # Batch insert all records for this by_type_item
-                if batch_inserts:
-                    success = batch_insert_rows(bq, alloc_data_dataset_name, so_cell_table_name, batch_inserts)
-                    if success:
-                        print(f"[INFO] Successfully batch inserted {len(batch_inserts)} SoCells for by_type_item")
-                    else:
-                        print(f"[ERROR] Failed to batch insert SoCells for by_type_item")
+
+                            # Insert to BigQuery
+                            success = bq.insert_row(
+                                dataset_id=alloc_data_dataset_name,
+                                table_id=so_cell_table_name,
+                                row_data=insert_so_cell
+                            )
+                            if success:
+                                print(f"[INFO][Step 230] Successfully inserted SoCell: {insert_so_cell}")
+                            else:
+                                print(f"[ERROR][Step 230] Failed to insert SoCell: {insert_so_cell}")
         print("[INFO] ================> DONE")
-        
+
     except Exception as e:
         print(f"Lỗi: {str(e)}")
 
