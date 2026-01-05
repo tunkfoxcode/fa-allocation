@@ -1,9 +1,6 @@
-from calculate.allocation_runner import run_allocate
 from calculate.report_runner import run_report
 
 if __name__ == '__main__':
-    # run_allocate()
-
     my_rep_temp = "KRF-L4.CDT1"
     my_z_block_plan =  "my_z_block_plan"
     my_z_block_forecast = "my_z_block_forecast"
