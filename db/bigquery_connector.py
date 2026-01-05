@@ -97,6 +97,7 @@ class BigQueryConnector:
                 row_dict = row_data
 
             def convert_decimals(obj):
+                from datetime import datetime, date
                 if isinstance(obj, dict):
                     return {k: convert_decimals(v) for k, v in obj.items()}
                 elif isinstance(obj, list):
@@ -105,6 +106,10 @@ class BigQueryConnector:
                     return round(float(obj), 9)
                 elif isinstance(obj, float):
                     return round(obj, 9)
+                elif isinstance(obj, datetime):
+                    return obj.isoformat()
+                elif isinstance(obj, date):
+                    return obj.isoformat()
                 else:
                     return obj
 
