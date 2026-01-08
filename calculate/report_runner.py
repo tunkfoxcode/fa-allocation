@@ -17,7 +17,7 @@ def find_or_create_rep_page(
 ) -> RepPage:
     """
     Find or create RepPage record in BigQuery
-    
+
     Args:
         bq: BigQueryConnector instance
         my_rep_temp: Report template name
@@ -29,7 +29,7 @@ def find_or_create_rep_page(
         project_id: BigQuery project ID
         report_dataset_name: Report dataset name
         rep_page_table_name: RepPage table name
-        
+
     Returns:
         RepPage instance (existing or newly created)
     """
@@ -38,16 +38,16 @@ def find_or_create_rep_page(
     z_block_plan_pack = plan_parts[1] if len(plan_parts) > 1 else None
     z_block_plan_scenario = plan_parts[2] if len(plan_parts) > 2 else None
     z_block_plan_run = plan_parts[3] if len(plan_parts) > 3 else None
-    
+
     forecast_parts = my_z_block_forecast.split("-")
     z_block_forecast_source = forecast_parts[0] if len(forecast_parts) > 0 else None
     z_block_forecast_pack = forecast_parts[1] if len(forecast_parts) > 1 else None
     z_block_forecast_scenario = forecast_parts[2] if len(forecast_parts) > 2 else None
     z_block_forecast_run = forecast_parts[3] if len(forecast_parts) > 3 else None
-    
+
     # Build query conditions dynamically, skip None values
     conditions = [f"MyRepTemp = '{my_rep_temp}'"]
-    
+
     if z_block_plan_source is not None:
         conditions.append(f"Z_BLOCK_ZBlockPlan_Source = '{z_block_plan_source}'")
     if z_block_plan_pack is not None:
@@ -64,19 +64,19 @@ def find_or_create_rep_page(
         conditions.append(f"ZBlockForecast_Scenario = '{z_block_forecast_scenario}'")
     if z_block_forecast_run is not None:
         conditions.append(f"ZBlockForecast_Run = '{z_block_forecast_run}'")
-    
+
     conditions.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
-    
+
     query_find_rep_page = f"""
     SELECT * 
     FROM `{project_id}.{report_dataset_name}.{rep_page_table_name}` 
     WHERE {' AND '.join(conditions)}
     LIMIT 1
     """
-    
+
     rep_page_df = bq.execute_query(query_find_rep_page)
     rep_page_items = RepPage.from_dataframe(rep_page_df)
-    
+
     if len(rep_page_items) > 0:
         my_rep_page = rep_page_items[0]
         print(f"[INFO][Step 20] Found existing RepPage: {my_rep_page}")
@@ -98,78 +98,26 @@ def find_or_create_rep_page(
             time_x_block_upload_at=datetime.now()
         )
 
-        #Step21 RepPage.YNumber1 = ZBloickPlan.YNUmber * 1000 + ZBlockForecast.YNumber
-        #Q&A: ZBloickPlan.YNUmber? ZBlockForecast.YNumber?
+        # Step21 RepPage.YNumber1 = ZBloickPlan.YNUmber * 1000 + ZBlockForecast.YNumber
+        # Q&A: ZBloickPlan.YNUmber? ZBlockForecast.YNumber?
         my_rep_page.y_number1 = 1000
-
 
         success = bq.insert_row(
             dataset_id=report_dataset_name,
             table_id=rep_page_table_name,
             row_data=my_rep_page.to_bigquery_dict()
         )
-        
+
         if success:
             print(f"[INFO][Step 20] Created new RepPage: {my_rep_page}")
         else:
             print(f"[ERROR][Step 20] Failed to create RepPage")
             raise Exception("Failed to create RepPage in BigQuery")
-    
+
     return my_rep_page
 
 
-def load_report(
-        my_rep_temp: str,
-        my_z_block_plan: str,
-        my_z_block_forecast: str,
-        my_alt: str,
-        my_last_report_month: str,
-        my_last_actual_month: str
-):
-    credentials_path = "/home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json"
-    project_id = "fp-a-project"
-    report_dataset_name = "Report_data"
-    rep_page_table_name = "RepPage"
-    report_config_dataset_name = "Report_config"
-    rep_temp_table_name = "RepTemp_NativeTable"
-    rep_temp_block_table_name = "RepTempBlock_NativeTable"
-
-    bq = BigQueryConnector(
-        credentials_path=credentials_path,
-        project_id=project_id
-    )
-
-    my_rep_page = find_or_create_rep_page(
-        bq=bq,
-        my_rep_temp=my_rep_temp,
-        my_z_block_plan=my_z_block_plan,
-        my_z_block_forecast=my_z_block_forecast,
-        my_alt=my_alt,
-        my_last_report_month=my_last_report_month,
-        my_last_actual_month=my_last_actual_month,
-        project_id=project_id,
-        report_dataset_name=report_dataset_name,
-        rep_page_table_name=rep_page_table_name
-    )
-
-    if my_rep_page is not None:
-        a = 1
-        #TODO 2b. LoadReport(MyRepPage): Array RepCell (N)
-    else:
-        b = 1
-        #TODO 2a. LoadReport (MyRepTemp, MyZBlock1Plan, MyZBlock1Forecast, MyALT): Array RepCell (N) (nếu chưa có MyRepPage thì call BuildReport)
-        build_report(
-            my_rep_temp=my_rep_temp,
-            my_z_block_plan=my_z_block_plan,
-            my_z_block_forecast=my_z_block_forecast,
-            my_alt=my_alt,
-            my_last_report_month=my_last_report_month,
-            my_last_actual_month=my_last_actual_month,
-        )
-
-
-#1. BuildReport (MyRepTemp, MyZBlock1Plan, MyZBlock1Forecast, MyALT): MyRepPage
-def build_report(
+def run_report(
         my_rep_temp: str,
         my_z_block_plan: str,
         my_z_block_forecast: str,
@@ -178,20 +126,21 @@ def build_report(
         my_last_actual_month: str
 ):
     print("Starting calculating")
-    
+
     credentials_path = "/home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json"
+    # credentials_path = "./fp-a-project-78576a96d839.json"
     project_id = "fp-a-project"
     report_dataset_name = "Report_data"
     rep_page_table_name = "RepPage"
     report_config_dataset_name = "Report_config"
     rep_temp_table_name = "RepTemp_NativeTable"
     rep_temp_block_table_name = "RepTempBlock_NativeTable"
-    
+
     bq = BigQueryConnector(
         credentials_path=credentials_path,
         project_id=project_id
     )
-    
+
     my_rep_page = find_or_create_rep_page(
         bq=bq,
         my_rep_temp=my_rep_temp,
@@ -204,27 +153,27 @@ def build_report(
         report_dataset_name=report_dataset_name,
         rep_page_table_name=rep_page_table_name
     )
-    
+
     print(f"[INFO][Step 20] Using RepPage: {my_rep_page}")
 
-    #Step30 Query from RepTemp (REP_TEMP_TYPE = MyRepTemp)
+    # Step30 Query from RepTemp (REP_TEMP_TYPE = MyRepTemp)
     query_rep_temp = f"""
     SELECT * 
     FROM `{project_id}.{report_config_dataset_name}.{rep_temp_table_name}` 
     WHERE REP_TEMP_TYPE = '{my_rep_temp}'
     """
-    
+
     rep_temp_df = bq.execute_query(query_rep_temp)
     rep_temp_items = RepTemp.from_dataframe(rep_temp_df)
 
     print(f"[INFO][Step 30] Found {len(rep_temp_items)} RepTemp records for type '{my_rep_temp}'")
 
     my_rep_temp_item = rep_temp_items[0]
-    
-    #Step31 MyZNumber = RepTemp.ZNumber
+
+    # Step31 MyZNumber = RepTemp.ZNumber
     my_z_number = my_rep_temp_item.z_number
 
-    #Step32 Query from RepPage(FK1= MyRepTemp, ZBlockPlan = MyZBlockPlan, ZBlockForecast=MyZBlockForecast, Alt = MyALT)
+    # Step32 Query from RepPage(FK1= MyRepTemp, ZBlockPlan = MyZBlockPlan, ZBlockForecast=MyZBlockForecast, Alt = MyALT)
 
     # SELECT * FROM
     # `fp - a - project.Report_data.RepPage`
@@ -252,23 +201,23 @@ def build_report(
     # AND
     # NOW_ZBlock2_ALT = "PLA5"  # MyALT
 
-    #Step33 MyYNumber1 = RepPage.YNumber1
+    # Step33 MyYNumber1 = RepPage.YNumber1
     my_y_number_1 = my_rep_page.y_number1
-    
-    #Step40 Query from RepTempBlock: (MyRepTemp) -> MyRepTempBlockList
+
+    # Step40 Query from RepTempBlock: (MyRepTemp) -> MyRepTempBlockList
 
     query_rep_temp_block = f"""
     SELECT * 
     FROM `{project_id}.{report_config_dataset_name}.{rep_temp_block_table_name}` 
     WHERE MyRepTemp = '{my_rep_temp}'
     """
-    
+
     rep_temp_block_df = bq.execute_query(query_rep_temp_block)
     my_rep_temp_block_list = RepTempBlock.from_dataframe(rep_temp_block_df)
-    
+
     print(f"[INFO][Step 40] Found {len(my_rep_temp_block_list)} RepTempBlock records for FK1 '{my_rep_temp}'")
 
-    #Steo50 Foreach  MyRepTempBlock in MyRepTempBlockList (YNumber2 Increasing)
+    # Step50 Foreach  MyRepTempBlock in MyRepTempBlockList (YNumber2 Increasing)
     for my_rep_temp_block in my_rep_temp_block_list:
         print(f"[INFO][Step 40] Processing RepTempBlock: {my_rep_temp_block}")
 
@@ -276,9 +225,9 @@ def build_report(
             continue
 
         # TODO: Add further processing logic for each RepTempBlock item
-        #Step60 MyYNumber2 = MyRepTempBlock.YNumber2
+        # Step60 MyYNumber2 = MyRepTempBlock.YNumber2
         my_y_number_2 = my_rep_temp_block.y_number2
-        
+
         # Step70 MyFilterType - Collect filter types and query AllocationToItem
         # Build initial map of field_name -> field_value for non-None fields
         field_map = {
@@ -317,14 +266,14 @@ def build_report(
             'NOW_Y_BLOCK_UNIT': my_rep_temp_block.now_y_block_unit,
             'NOW_Y_BLOCK_TD_BU': my_rep_temp_block.now_y_block_td_bu
         }
-        
+
         field_map = {k: v for k, v in field_map.items() if v is not None}
         print(f"[INFO][Step 70] Field map with non-None values: {field_map}")
-        
+
         my_filter_item_map = {}
         allocation_config_dataset = "allocation_config"
         allocation_to_item_table = "AllocationToItem_NativeTable"
-        
+
         for field_name, field_value in field_map.items():
             if '-' in field_value:
                 parts = field_value.rsplit('-', 1)
@@ -334,20 +283,20 @@ def build_report(
                     to_type = field_value
             else:
                 to_type = field_value
-            
+
             query_filter_items = f"""
             SELECT TO_Y_BLOCK_ToItem 
             FROM `{project_id}.{allocation_config_dataset}.{allocation_to_item_table}` 
             WHERE TO_Y_BLOCK_ToType = '{to_type}'
             """
-            
+
             filter_items_df = bq.execute_query(query_filter_items)
-            
+
             if len(filter_items_df) > 0:
                 to_items = filter_items_df['TO_Y_BLOCK_ToItem'].tolist()
                 my_filter_item_map[field_name] = to_items
                 print(f"[INFO][Step 70] {field_name} ({to_type}): Found {len(to_items)} items")
-        
+
         print(f"[INFO][Step 70] MyFilterItemMap: {my_filter_item_map}")
 
         # Step80 MyKRTypeFull - Collect KR-related fields
@@ -363,20 +312,20 @@ def build_report(
             'NOW_Y_BLOCK_KR_Item_Code_KR8': my_rep_temp_block.now_y_block_kr_item_code_kr8,
             'NOW_Y_BLOCK_KR_Item_Name': my_rep_temp_block.now_y_block_kr_item_name
         }
-        
+
         # Filter out None values
         my_kr_type_full = {k: v for k, v in my_kr_type_full.items() if v is not None}
         print(f"[INFO][Step 80] MyKRTypeFull: {my_kr_type_full}")
-        
+
         # Step100 Create Cartesian product of filter items
         # Generate all combinations of filter items from the map
         from itertools import product
-        
+
         if my_filter_item_map:
             # Get keys and values from the map
             field_names = list(my_filter_item_map.keys())
             field_values_lists = list(my_filter_item_map.values())
-            
+
             # Create Cartesian product
             filter_combinations = []
             for combination in product(*field_values_lists):
@@ -384,7 +333,7 @@ def build_report(
                 for i, field_name in enumerate(field_names):
                     combination_map[field_name] = combination[i]
                 filter_combinations.append(combination_map)
-            
+
             print(f"[INFO][Step 80] Created {len(filter_combinations)} filter combinations")
             print(f"[INFO][Step 80] First 3 combinations: {filter_combinations[:3]}")
         else:
@@ -392,42 +341,42 @@ def build_report(
             print(f"[INFO][Step 80] No filter items to combine")
 
         for my_filter_item in filter_combinations:
-            #Step120 Foreach MyFilterItem (L incresing)
-            l_items =  [0,1,2,3,4,5]
+            # Step120 Foreach MyFilterItem (L incresing)
+            l_items = [0, 1, 2, 3, 4, 5]
             for l in l_items:
-                #Step140 MyXPeriod = MyLastReportMonth - L
+                # Step140 MyXPeriod = MyLastReportMonth - L
                 # MyLastReportMonth format: M2504 (April 2025)
                 # Parse year and month from MyLastReportMonth
                 year = int(my_last_report_month[1:3])  # "25" from "M2504"
                 month = int(my_last_report_month[3:5])  # "04" from "M2504"
-                
+
                 # Calculate new month and year after subtracting L
                 total_months = year * 12 + month - l
                 new_year = total_months // 12
                 new_month = total_months % 12
-                
+
                 # Handle month = 0 case (should be December of previous year)
                 if new_month == 0:
                     new_month = 12
                     new_year -= 1
-                
+
                 # Format back to M{YY}{MM} format
                 my_x_period = f"M{new_year:02d}{new_month:02d}"
                 print(f"[INFO][Step 140] L={l}, MyLastReportMonth={my_last_report_month}, MyXPeriod={my_x_period}")
 
-                #Step150 MyYNumber3 = L
+                # Step150 MyYNumber3 = L
                 my_y_number_3 = l
-                
-                #Step160 Query from SOCell: (MyZBlockPlan, MyKRTypeFull, MyFilterItem, MyXPeriod) -> SOCell1 = NowValue //Plan
+
+                # Step160 Query from SOCell: (MyZBlockPlan, MyKRTypeFull, MyFilterItem, MyXPeriod) -> SOCell1 = NowValue //Plan
                 # Parse MyZBlockPlan from my_rep_page
                 z_block_plan_source = my_rep_page.z_block_zblock_plan_source
                 z_block_plan_pack = my_rep_page.z_block_zblock_plan_pack
                 z_block_plan_scenario = my_rep_page.z_block_zblock_plan_scenario
                 z_block_plan_run = my_rep_page.z_block_zblock_plan_run
-                
+
                 # Build WHERE conditions dynamically
                 where_conditions = []
-                
+
                 # Add ZBlock Plan conditions
                 if z_block_plan_source:
                     where_conditions.append(f"z_block_zblock1_source = '{z_block_plan_source}'")
@@ -437,7 +386,7 @@ def build_report(
                     where_conditions.append(f"z_block_zblock1_scenario = '{z_block_plan_scenario}'")
                 if z_block_plan_run:
                     where_conditions.append(f"z_block_zblock1_run = '{z_block_plan_run}'")
-                
+
                 # Add MyKRTypeFull conditions (map field names to SoCell field names)
                 kr_field_mapping = {
                     'NOW_Y_BLOCK_FNF_FNF': 'now_y_block_fnf_fnf',
@@ -451,12 +400,12 @@ def build_report(
                     'NOW_Y_BLOCK_KR_Item_Code_KR8': 'now_y_block_kr_item_code_kr8',
                     'NOW_Y_BLOCK_KR_Item_Name': 'now_y_block_kr_item_name'
                 }
-                
+
                 for kr_field, kr_value in my_kr_type_full.items():
                     if kr_field in kr_field_mapping:
                         so_cell_field = kr_field_mapping[kr_field]
                         where_conditions.append(f"{so_cell_field} = '{kr_value}'")
-                
+
                 # Add MyFilterItem conditions (map field names to SoCell field names)
                 filter_field_mapping = {
                     'NOW_Y_BLOCK_CDT_CDT1': 'now_y_block_cdt_cdt1',
@@ -494,19 +443,19 @@ def build_report(
                     'NOW_Y_BLOCK_UNIT': 'now_y_block_unit',
                     'NOW_Y_BLOCK_TD_BU': 'now_y_block_td_bu'
                 }
-                
+
                 for filter_field, filter_value in my_filter_item.items():
                     if filter_field in filter_field_mapping:
                         so_cell_field = filter_field_mapping[filter_field]
                         where_conditions.append(f"{so_cell_field} = '{filter_value}'")
-                
+
                 # Add MyXPeriod condition
                 where_conditions.append(f"now_np = '{my_x_period}'")
-                
+
                 # Build and execute query
                 alloc_stage_dataset = "alloc_stage"
-                so_cell_table = "so_cell_raw_full"
-                
+                so_cell_table = "so_cell_processed"
+
                 query_so_cell = f"""
                 SELECT now_value 
                 FROM `{project_id}.{alloc_stage_dataset}.{so_cell_table}` 
@@ -514,9 +463,9 @@ def build_report(
                 ORDER BY uploaded_at DESC
                 LIMIT 1
                 """
-                
+
                 so_cell_df = bq.execute_query(query_so_cell)
-                
+
                 if len(so_cell_df) > 0:
                     so_cell1_now_value = so_cell_df.iloc[0]['now_value']
                     print(f"[INFO][Step 160] SOCell1 NowValue (Plan): {so_cell1_now_value}")
@@ -524,28 +473,28 @@ def build_report(
                     so_cell1_now_value = None
                     print(f"[WARN][Step 160] No SOCell data found for Plan")
 
-                #Step170 Query from SOCell: (Zblock = "ACT", MyKRTypeFull, MyFilterItem, MyXPeriod) -> SOCell2 = NowValue //Actual
+                # Step170 Query from SOCell: (Zblock = "ACT", MyKRTypeFull, MyFilterItem, MyXPeriod) -> SOCell2 = NowValue //Actual
                 # Build WHERE conditions for Actual scenario
                 where_conditions_actual = []
-                
+
                 # Add hardcoded Actual scenario condition
-                where_conditions_actual.append("z_block_zblock1_scenario = 'Actual'")
-                
+                where_conditions_actual.append("z_block_zblock1_source = 'ACTUAL'")
+
                 # Add MyKRTypeFull conditions
                 for kr_field, kr_value in my_kr_type_full.items():
                     if kr_field in kr_field_mapping:
                         so_cell_field = kr_field_mapping[kr_field]
                         where_conditions_actual.append(f"{so_cell_field} = '{kr_value}'")
-                
+
                 # Add MyFilterItem conditions
                 for filter_field, filter_value in my_filter_item.items():
                     if filter_field in filter_field_mapping:
                         so_cell_field = filter_field_mapping[filter_field]
                         where_conditions_actual.append(f"{so_cell_field} = '{filter_value}'")
-                
+
                 # Add MyXPeriod condition
                 where_conditions_actual.append(f"now_np = '{my_x_period}'")
-                
+
                 # Build and execute query for Actual
                 query_so_cell_actual = f"""
                 SELECT now_value 
@@ -554,9 +503,9 @@ def build_report(
                 ORDER BY uploaded_at DESC
                 LIMIT 1
                 """
-                
+
                 so_cell_actual_df = bq.execute_query(query_so_cell_actual)
-                
+
                 if len(so_cell_actual_df) > 0:
                     so_cell2_now_value = so_cell_actual_df.iloc[0]['now_value']
                     print(f"[INFO][Step 170] SOCell2 NowValue (Actual): {so_cell2_now_value}")
@@ -564,16 +513,16 @@ def build_report(
                     so_cell2_now_value = None
                     print(f"[WARN][Step 170] No SOCell data found for Actual")
 
-                #Step180 Query from SOCell: (MyZBlockForecast, MyKRTypeFull, MyFilterItem, MyXPeriod) -> SOCell3 = NowValue //Forecast
+                # Step180 Query from SOCell: (MyZBlockForecast, MyKRTypeFull, MyFilterItem, MyXPeriod) -> SOCell3 = NowValue //Forecast
                 # Parse MyZBlockForecast from my_rep_page
                 z_block_forecast_source = my_rep_page.z_block_forecast_source
                 z_block_forecast_pack = my_rep_page.z_block_forecast_pack
                 z_block_forecast_scenario = my_rep_page.z_block_forecast_scenario
                 z_block_forecast_run = my_rep_page.z_block_forecast_run
-                
+
                 # Build WHERE conditions for Forecast
                 where_conditions_forecast = []
-                
+
                 # Add ZBlock Forecast conditions
                 if z_block_forecast_source:
                     where_conditions_forecast.append(f"z_block_zblock1_source = '{z_block_forecast_source}'")
@@ -583,22 +532,22 @@ def build_report(
                     where_conditions_forecast.append(f"z_block_zblock1_scenario = '{z_block_forecast_scenario}'")
                 if z_block_forecast_run:
                     where_conditions_forecast.append(f"z_block_zblock1_run = '{z_block_forecast_run}'")
-                
+
                 # Add MyKRTypeFull conditions
                 for kr_field, kr_value in my_kr_type_full.items():
                     if kr_field in kr_field_mapping:
                         so_cell_field = kr_field_mapping[kr_field]
                         where_conditions_forecast.append(f"{so_cell_field} = '{kr_value}'")
-                
+
                 # Add MyFilterItem conditions
                 for filter_field, filter_value in my_filter_item.items():
                     if filter_field in filter_field_mapping:
                         so_cell_field = filter_field_mapping[filter_field]
                         where_conditions_forecast.append(f"{so_cell_field} = '{filter_value}'")
-                
+
                 # Add MyXPeriod condition
                 where_conditions_forecast.append(f"now_np = '{my_x_period}'")
-                
+
                 # Build and execute query for Forecast
                 query_so_cell_forecast = f"""
                 SELECT now_value 
@@ -607,9 +556,9 @@ def build_report(
                 ORDER BY uploaded_at DESC
                 LIMIT 1
                 """
-                
+
                 so_cell_forecast_df = bq.execute_query(query_so_cell_forecast)
-                
+
                 if len(so_cell_forecast_df) > 0:
                     so_cell3_now_value = so_cell_forecast_df.iloc[0]['now_value']
                     print(f"[INFO][Step 180] SOCell3 NowValue (Forecast): {so_cell3_now_value}")
@@ -617,7 +566,7 @@ def build_report(
                     so_cell3_now_value = None
                     print(f"[WARN][Step 180] No SOCell data found for Forecast")
 
-                #Step190 Write to RepCell: Write Plan
+                # Step190 Write to RepCell: Write Plan
                 # Create RepCell instance for Plan
                 rep_cell_plan = RepCell(
                     z_number=my_z_number,
@@ -630,7 +579,7 @@ def build_report(
                     now_np=my_x_period,
                     now_value=so_cell1_now_value
                 )
-                
+
                 # Populate KR fields from my_kr_type_full
                 kr_field_map = {
                     'NOW_Y_BLOCK_FNF_FNF': 'now_y_block_fnf_fnf',
@@ -644,11 +593,11 @@ def build_report(
                     'NOW_Y_BLOCK_KR_Item_Code_KR8': 'now_y_block_kr_item_code_kr8',
                     'NOW_Y_BLOCK_KR_Item_Name': 'now_y_block_kr_item_name'
                 }
-                
+
                 for kr_field, kr_value in my_kr_type_full.items():
                     if kr_field in kr_field_map:
                         setattr(rep_cell_plan, kr_field_map[kr_field], kr_value)
-                
+
                 # Populate filter fields from my_filter_item
                 filter_field_map = {
                     'NOW_Y_BLOCK_CDT_CDT1': 'now_y_block_cdt_cdt1',
@@ -686,37 +635,37 @@ def build_report(
                     'NOW_Y_BLOCK_UNIT': 'now_y_block_unit',
                     'NOW_Y_BLOCK_TD_BU': 'now_y_block_td_bu'
                 }
-                
+
                 for filter_field, filter_value in my_filter_item.items():
                     if filter_field in filter_field_map:
                         setattr(rep_cell_plan, filter_field_map[filter_field], filter_value)
-                
+
                 # Insert into BigQuery
                 rep_cell_dataset = "Report_data"
                 rep_cell_table = "RepCell"
-                
+
                 bq.insert_row(
-                    dataset_name=rep_cell_dataset,
-                    table_name=rep_cell_table,
+                    dataset_id=rep_cell_dataset,
+                    table_id=rep_cell_table,
                     row_data=rep_cell_plan.to_bigquery_dict()
                 )
-                
+
                 print(f"[INFO][Step 190] Inserted RepCell (Plan): z_number={my_z_number}, "
                       f"y_number1={my_y_number_1}, y_number2={my_y_number_2}, y_number3={my_y_number_3}, "
                       f"now_value={so_cell1_now_value}")
 
-                #Step200 Write to RepCell: ActualForecast (choose Actual or Forecast based on LastActualMonth)
+                # Step200 Write to RepCell: ActualForecast (choose Actual or Forecast based on LastActualMonth)
                 # Compare LastActualMonth with MyXPeriod
                 # Format: M2504 (April 2025)
                 last_actual_month_year = int(my_last_report_month[1:3])
                 last_actual_month_month = int(my_last_report_month[3:5])
                 my_x_period_year = int(my_x_period[1:3])
                 my_x_period_month = int(my_x_period[3:5])
-                
+
                 # Convert to comparable format (total months)
                 last_actual_total = last_actual_month_year * 12 + last_actual_month_month
                 my_x_period_total = my_x_period_year * 12 + my_x_period_month
-                
+
                 if last_actual_total >= my_x_period_total:
                     # Use Actual data (SOCell2)
                     rep_cell_actual_forecast = RepCell(
@@ -730,24 +679,24 @@ def build_report(
                         now_np=my_x_period,
                         now_value=so_cell2_now_value
                     )
-                    
+
                     # Populate KR fields
                     for kr_field, kr_value in my_kr_type_full.items():
                         if kr_field in kr_field_map:
                             setattr(rep_cell_actual_forecast, kr_field_map[kr_field], kr_value)
-                    
+
                     # Populate filter fields
                     for filter_field, filter_value in my_filter_item.items():
                         if filter_field in filter_field_map:
                             setattr(rep_cell_actual_forecast, filter_field_map[filter_field], filter_value)
-                    
+
                     # Insert into BigQuery
                     bq.insert_row(
-                        dataset_name=rep_cell_dataset,
-                        table_name=rep_cell_table,
+                        dataset_id=rep_cell_dataset,
+                        table_id=rep_cell_table,
                         row_data=rep_cell_actual_forecast.to_bigquery_dict()
                     )
-                    
+
                     print(f"[INFO][Step 200] Inserted RepCell (ActualForecast-Actual): "
                           f"LastActualMonth={my_last_report_month} >= MyXPeriod={my_x_period}, "
                           f"now_value={so_cell2_now_value}")
@@ -764,27 +713,24 @@ def build_report(
                         now_np=my_x_period,
                         now_value=so_cell3_now_value
                     )
-                    
+
                     # Populate KR fields
                     for kr_field, kr_value in my_kr_type_full.items():
                         if kr_field in kr_field_map:
                             setattr(rep_cell_actual_forecast, kr_field_map[kr_field], kr_value)
-                    
+
                     # Populate filter fields
                     for filter_field, filter_value in my_filter_item.items():
                         if filter_field in filter_field_map:
                             setattr(rep_cell_actual_forecast, filter_field_map[filter_field], filter_value)
-                    
+
                     # Insert into BigQuery
                     bq.insert_row(
                         dataset_name=rep_cell_dataset,
                         table_name=rep_cell_table,
                         row_data=rep_cell_actual_forecast.to_bigquery_dict()
                     )
-                    
+
                     print(f"[INFO][Step 200] Inserted RepCell (ActualForecast-Forecast): "
                           f"LastActualMonth={my_last_report_month} < MyXPeriod={my_x_period}, "
                           f"now_value={so_cell3_now_value}")
-
-
-    
