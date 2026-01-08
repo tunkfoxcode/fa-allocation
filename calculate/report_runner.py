@@ -1,6 +1,10 @@
 from db.bigquery_connector import BigQueryConnector
 from models.report_models import RepPage, RepTemp, RepTempBlock, RepCell
 from datetime import datetime
+from typing import List
+from app_config import get_settings
+
+settings = get_settings()
 
 
 def find_or_create_rep_page(
@@ -14,7 +18,7 @@ def find_or_create_rep_page(
         project_id: str,
         report_dataset_name: str,
         rep_page_table_name: str
-) -> RepPage:
+) -> tuple[RepPage, bool]:
     """
     Find or create RepPage record in BigQuery
 
@@ -31,7 +35,7 @@ def find_or_create_rep_page(
         rep_page_table_name: RepPage table name
 
     Returns:
-        RepPage instance (existing or newly created)
+        tuple[RepPage, bool]: (RepPage instance, is_newly_created flag)
     """
     plan_parts = my_z_block_plan.split("-")
     z_block_plan_source = plan_parts[0] if len(plan_parts) > 0 else None
@@ -80,6 +84,7 @@ def find_or_create_rep_page(
     if len(rep_page_items) > 0:
         my_rep_page = rep_page_items[0]
         print(f"[INFO][Step 20] Found existing RepPage: {my_rep_page}")
+        return my_rep_page, False
     else:
         my_rep_page = RepPage(
             y_number1=None,
@@ -110,38 +115,52 @@ def find_or_create_rep_page(
 
         if success:
             print(f"[INFO][Step 20] Created new RepPage: {my_rep_page}")
+            return my_rep_page, True
         else:
             print(f"[ERROR][Step 20] Failed to create RepPage")
             raise Exception("Failed to create RepPage in BigQuery")
 
-    return my_rep_page
 
-
-def run_report(
+def load_report(
         my_rep_temp: str,
         my_z_block_plan: str,
         my_z_block_forecast: str,
         my_alt: str,
         my_last_report_month: str,
-        my_last_actual_month: str
-):
-    print("Starting calculating")
-
-    credentials_path = "/home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json"
-    # credentials_path = "./fp-a-project-78576a96d839.json"
-    project_id = "fp-a-project"
-    report_dataset_name = "Report_data"
-    rep_page_table_name = "RepPage"
-    report_config_dataset_name = "Report_config"
-    rep_temp_table_name = "RepTemp_NativeTable"
-    rep_temp_block_table_name = "RepTempBlock_NativeTable"
-
+        my_last_actual_month: str = None
+) -> List[RepCell]:
+    """
+    Main entry point for loading report data.
+    
+    This function:
+    1. Finds or creates RepPage
+    2. If newly created, builds report and loads RepCell data
+    3. If already exists, checks for RepCell data:
+       - If exists: loads and returns
+       - If not exists: builds report and loads RepCell data
+    
+    Args:
+        my_rep_temp: Report template name
+        my_z_block_plan: Plan block string
+        my_z_block_forecast: Forecast block string
+        my_alt: ALT identifier
+        my_last_report_month: Last report month
+        my_last_actual_month: Last actual month (optional)
+    
+    Returns:
+        List[RepCell]: Array of RepCell records
+    """
+    print("[INFO] Starting load_report")
+    
     bq = BigQueryConnector(
-        credentials_path=credentials_path,
-        project_id=project_id
+        credentials_path=settings.GCP_CREDENTIALS_PATH,
+        project_id=settings.GCP_PROJECT_ID
     )
-
-    my_rep_page = find_or_create_rep_page(
+    
+    print(f"[INFO] Processing report for: {my_rep_temp}, {my_z_block_plan}, {my_z_block_forecast}")
+    
+    # Step 1: Find or create RepPage
+    existing_rep_page, is_newly_created = find_or_create_rep_page(
         bq=bq,
         my_rep_temp=my_rep_temp,
         my_z_block_plan=my_z_block_plan,
@@ -149,17 +168,113 @@ def run_report(
         my_alt=my_alt,
         my_last_report_month=my_last_report_month,
         my_last_actual_month=my_last_actual_month,
-        project_id=project_id,
-        report_dataset_name=report_dataset_name,
-        rep_page_table_name=rep_page_table_name
+        project_id=settings.GCP_PROJECT_ID,
+        report_dataset_name=settings.REPORT_DATASET_NAME,
+        rep_page_table_name=settings.REP_PAGE_TABLE_NAME
     )
+    
+    print(f"[INFO] Using RepPage: {existing_rep_page} (newly_created={is_newly_created})")
+    
+    # Step 2: Branch based on whether RepPage was newly created
+    if is_newly_created:
+        # RepPage just created - definitely need to build report
+        print(f"[INFO] RepPage newly created, building report...")
+        
+        build_report(
+            bq=bq,
+            my_rep_page=existing_rep_page,
+            my_rep_temp=my_rep_temp,
+            my_last_report_month=my_last_report_month,
+            my_last_actual_month=my_last_actual_month,
+            project_id=project_id
+        )
+        
+        print(f"[INFO] Report built successfully, loading RepCell data...")
+    else:
+        # RepPage already existed - check if RepCell data exists
+        print(f"[INFO] RepPage already exists, checking for RepCell data...")
+        query_check_rep_cell = f"""
+        SELECT COUNT(*) as count
+        FROM `{settings.GCP_PROJECT_ID}.{settings.REPORT_DATASET_NAME}.{settings.REP_CELL_TABLE_NAME}` 
+        WHERE MyRepPage = '{my_z_block_plan}'
+        """
+        
+        check_df = bq.execute_query(query_check_rep_cell)
+        rep_cell_count = check_df.iloc[0]['count'] if len(check_df) > 0 else 0
+        
+        if rep_cell_count == 0:
+            # RepCell data doesn't exist - need to build report
+            print(f"[INFO] No RepCell data found, building report...")
+            
+            build_report(
+                bq=bq,
+                my_rep_page=existing_rep_page,
+                my_rep_temp=my_rep_temp,
+                my_last_report_month=my_last_report_month,
+                my_last_actual_month=my_last_actual_month,
+                project_id=settings.GCP_PROJECT_ID
+            )
+            
+            print(f"[INFO] Report built successfully, loading RepCell data...")
+        else:
+            print(f"[INFO] Found existing {rep_cell_count} RepCell records")
+    
+    # Step 3: Load and return RepCell data
+    print(f"[INFO] Loading RepCell data for RepPage: {my_z_block_plan}")
+    query_rep_cell = f"""
+    SELECT * 
+    FROM `{settings.GCP_PROJECT_ID}.{settings.REPORT_DATASET_NAME}.{settings.REP_CELL_TABLE_NAME}` 
+    WHERE MyRepPage = '{my_z_block_plan}'
+    ORDER BY YNumber2, YNumber3, Z_BLOCK_TYPE
+    """
+    
+    rep_cell_df = bq.execute_query(query_rep_cell)
+    
+    if len(rep_cell_df) == 0:
+        print(f"[WARN] No RepCell data found for RepPage: {my_z_block_plan}")
+        return []
+    
+    rep_cells = RepCell.from_dataframe(rep_cell_df)
+    print(f"[INFO] Successfully loaded {len(rep_cells)} RepCell records")
+    return rep_cells
+
+
+def build_report(
+        bq: BigQueryConnector,
+        my_rep_page: RepPage,
+        my_rep_temp: str,
+        my_last_report_month: str,
+        my_last_actual_month: str,
+        project_id: str
+) -> str:
+    """
+    Build a new report by generating RepCell records.
+    
+    This function:
+    1. Queries RepTemp and RepTempBlock configurations
+    2. Generates filter combinations (Cartesian product)
+    3. Queries SOCell data for Plan, Actual, and Forecast
+    4. Creates RepCell records for each combination and period
+    
+    Args:
+        bq: BigQueryConnector instance
+        my_rep_page: RepPage instance (already created)
+        my_rep_temp: Report template name
+        my_last_report_month: Last report month
+        my_last_actual_month: Last actual month
+        project_id: BigQuery project ID
+    
+    Returns:
+        str: RepPage identifier
+    """
+    print("[INFO] Starting build_report")
 
     print(f"[INFO][Step 20] Using RepPage: {my_rep_page}")
 
     # Step30 Query from RepTemp (REP_TEMP_TYPE = MyRepTemp)
     query_rep_temp = f"""
     SELECT * 
-    FROM `{project_id}.{report_config_dataset_name}.{rep_temp_table_name}` 
+    FROM `{project_id}.{settings.REPORT_CONFIG_DATASET_NAME}.{settings.REP_TEMP_TABLE_NAME}` 
     WHERE REP_TEMP_TYPE = '{my_rep_temp}'
     """
 
@@ -208,7 +323,7 @@ def run_report(
 
     query_rep_temp_block = f"""
     SELECT * 
-    FROM `{project_id}.{report_config_dataset_name}.{rep_temp_block_table_name}` 
+    FROM `{project_id}.{settings.REPORT_CONFIG_DATASET_NAME}.{settings.REP_TEMP_BLOCK_TABLE_NAME}` 
     WHERE MyRepTemp = '{my_rep_temp}'
     """
 
@@ -271,8 +386,6 @@ def run_report(
         print(f"[INFO][Step 70] Field map with non-None values: {field_map}")
 
         my_filter_item_map = {}
-        allocation_config_dataset = "allocation_config"
-        allocation_to_item_table = "AllocationToItem_NativeTable"
 
         for field_name, field_value in field_map.items():
             if '-' in field_value:
@@ -286,7 +399,7 @@ def run_report(
 
             query_filter_items = f"""
             SELECT TO_Y_BLOCK_ToItem 
-            FROM `{project_id}.{allocation_config_dataset}.{allocation_to_item_table}` 
+            FROM `{project_id}.{settings.ALLOCATION_CONFIG_DATASET_NAME}.{settings.ALLOCATION_TO_ITEM_TABLE_NAME}` 
             WHERE TO_Y_BLOCK_ToType = '{to_type}'
             """
 
@@ -453,12 +566,9 @@ def run_report(
                 where_conditions.append(f"now_np = '{my_x_period}'")
 
                 # Build and execute query
-                alloc_stage_dataset = "alloc_stage"
-                so_cell_table = "so_cell_processed"
-
                 query_so_cell = f"""
                 SELECT now_value 
-                FROM `{project_id}.{alloc_stage_dataset}.{so_cell_table}` 
+                FROM `{project_id}.{settings.ALLOC_STAGE_DATASET_NAME}.{settings.SO_CELL_TABLE_NAME}` 
                 WHERE {' AND '.join(where_conditions)}
                 ORDER BY uploaded_at DESC
                 LIMIT 1
@@ -498,7 +608,7 @@ def run_report(
                 # Build and execute query for Actual
                 query_so_cell_actual = f"""
                 SELECT now_value 
-                FROM `{project_id}.{alloc_stage_dataset}.{so_cell_table}` 
+                FROM `{project_id}.{settings.ALLOC_STAGE_DATASET_NAME}.{settings.SO_CELL_TABLE_NAME}` 
                 WHERE {' AND '.join(where_conditions_actual)}
                 ORDER BY uploaded_at DESC
                 LIMIT 1
@@ -551,7 +661,7 @@ def run_report(
                 # Build and execute query for Forecast
                 query_so_cell_forecast = f"""
                 SELECT now_value 
-                FROM `{project_id}.{alloc_stage_dataset}.{so_cell_table}` 
+                FROM `{project_id}.{settings.ALLOC_STAGE_DATASET_NAME}.{settings.SO_CELL_TABLE_NAME}` 
                 WHERE {' AND '.join(where_conditions_forecast)}
                 ORDER BY uploaded_at DESC
                 LIMIT 1
@@ -641,12 +751,9 @@ def run_report(
                         setattr(rep_cell_plan, filter_field_map[filter_field], filter_value)
 
                 # Insert into BigQuery
-                rep_cell_dataset = "Report_data"
-                rep_cell_table = "RepCell"
-
                 bq.insert_row(
-                    dataset_id=rep_cell_dataset,
-                    table_id=rep_cell_table,
+                    dataset_id=settings.REPORT_DATASET_NAME,
+                    table_id=settings.REP_CELL_TABLE_NAME,
                     row_data=rep_cell_plan.to_bigquery_dict()
                 )
 
@@ -692,8 +799,8 @@ def run_report(
 
                     # Insert into BigQuery
                     bq.insert_row(
-                        dataset_id=rep_cell_dataset,
-                        table_id=rep_cell_table,
+                        dataset_id=settings.REPORT_DATASET_NAME,
+                        table_id=settings.REP_CELL_TABLE_NAME,
                         row_data=rep_cell_actual_forecast.to_bigquery_dict()
                     )
 
@@ -726,11 +833,16 @@ def run_report(
 
                     # Insert into BigQuery
                     bq.insert_row(
-                        dataset_name=rep_cell_dataset,
-                        table_name=rep_cell_table,
+                        dataset_id=settings.REPORT_DATASET_NAME,
+                        table_id=settings.REP_CELL_TABLE_NAME,
                         row_data=rep_cell_actual_forecast.to_bigquery_dict()
                     )
 
                     print(f"[INFO][Step 200] Inserted RepCell (ActualForecast-Forecast): "
                           f"LastActualMonth={my_last_report_month} < MyXPeriod={my_x_period}, "
                           f"now_value={so_cell3_now_value}")
+    
+    # Get RepPage identifier (using z_block_plan as identifier)
+    rep_page_identifier = f"{my_rep_page.z_block_zblock_plan_source}-{my_rep_page.z_block_zblock_plan_pack}-{my_rep_page.z_block_zblock_plan_scenario}-{my_rep_page.z_block_zblock_plan_run}"
+    print(f"[INFO] build_report completed successfully. RepPage: {rep_page_identifier}")
+    return rep_page_identifier

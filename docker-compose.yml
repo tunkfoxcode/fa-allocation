@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  finance-allocation-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: finance-allocation-api
+    ports:
+      - "8000:8000"
+    environment:
+      # Application settings
+      - APP_NAME=Finance Allocation Report API
+      - APP_VERSION=1.0.0
+      - DEBUG=false
+      
+      # BigQuery settings
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-fp-a-project}
+      - GCP_CREDENTIALS_PATH=/app/credentials/fp-a-project.json
+      
+      # Dataset names
+      - REPORT_DATASET_NAME=${REPORT_DATASET_NAME:-Report_data}
+      - REPORT_CONFIG_DATASET_NAME=${REPORT_CONFIG_DATASET_NAME:-Report_config}
+      - ALLOCATION_CONFIG_DATASET_NAME=${ALLOCATION_CONFIG_DATASET_NAME:-allocation_config}
+      - ALLOC_STAGE_DATASET_NAME=${ALLOC_STAGE_DATASET_NAME:-alloc_stage}
+      
+      # Table names
+      - REP_PAGE_TABLE_NAME=${REP_PAGE_TABLE_NAME:-RepPage}
+      - REP_TEMP_TABLE_NAME=${REP_TEMP_TABLE_NAME:-RepTemp_NativeTable}
+      - REP_TEMP_BLOCK_TABLE_NAME=${REP_TEMP_BLOCK_TABLE_NAME:-RepTempBlock_NativeTable}
+      - REP_CELL_TABLE_NAME=${REP_CELL_TABLE_NAME:-RepCell}
+      - ALLOCATION_TO_ITEM_TABLE_NAME=${ALLOCATION_TO_ITEM_TABLE_NAME:-AllocationToItem_NativeTable}
+      - SO_CELL_TABLE_NAME=${SO_CELL_TABLE_NAME:-so_cell_processed}
+      
+      # API settings
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    volumes:
+      # Mount GCP credentials
+      - ./credentials:/app/credentials:ro
+      # Mount logs directory (optional)
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - finance-network
+
+networks:
+  finance-network:
+    driver: bridge
