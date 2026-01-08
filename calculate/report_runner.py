@@ -118,7 +118,58 @@ def find_or_create_rep_page(
     return my_rep_page
 
 
-def run_report(
+def load_report(
+        my_rep_temp: str,
+        my_z_block_plan: str,
+        my_z_block_forecast: str,
+        my_alt: str,
+        my_last_report_month: str,
+        my_last_actual_month: str
+):
+    credentials_path = "/home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json"
+    project_id = "fp-a-project"
+    report_dataset_name = "Report_data"
+    rep_page_table_name = "RepPage"
+    report_config_dataset_name = "Report_config"
+    rep_temp_table_name = "RepTemp_NativeTable"
+    rep_temp_block_table_name = "RepTempBlock_NativeTable"
+
+    bq = BigQueryConnector(
+        credentials_path=credentials_path,
+        project_id=project_id
+    )
+
+    my_rep_page = find_or_create_rep_page(
+        bq=bq,
+        my_rep_temp=my_rep_temp,
+        my_z_block_plan=my_z_block_plan,
+        my_z_block_forecast=my_z_block_forecast,
+        my_alt=my_alt,
+        my_last_report_month=my_last_report_month,
+        my_last_actual_month=my_last_actual_month,
+        project_id=project_id,
+        report_dataset_name=report_dataset_name,
+        rep_page_table_name=rep_page_table_name
+    )
+
+    if my_rep_page is not None:
+        a = 1
+        #TODO 2b. LoadReport(MyRepPage): Array RepCell (N)
+    else:
+        b = 1
+        #TODO 2a. LoadReport (MyRepTemp, MyZBlock1Plan, MyZBlock1Forecast, MyALT): Array RepCell (N) (nếu chưa có MyRepPage thì call BuildReport)
+        build_report(
+            my_rep_temp=my_rep_temp,
+            my_z_block_plan=my_z_block_plan,
+            my_z_block_forecast=my_z_block_forecast,
+            my_alt=my_alt,
+            my_last_report_month=my_last_report_month,
+            my_last_actual_month=my_last_actual_month,
+        )
+
+
+#1. BuildReport (MyRepTemp, MyZBlock1Plan, MyZBlock1Forecast, MyALT): MyRepPage
+def build_report(
         my_rep_temp: str,
         my_z_block_plan: str,
         my_z_block_forecast: str,

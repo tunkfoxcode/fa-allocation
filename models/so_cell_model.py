@@ -129,7 +129,7 @@ class SoCell:
         return cls(
             i_o=data.get('i_o'),
             z_block_zblock1_source=data.get('z_block_zblock1_source'),
-            z_block_zblock1_pack=data.get('z_block_zblock1_pack'),
+            z_block_zblock1_pack=data.get('Z-BLOCK_ZBlock1_PCK'),
             z_block_zblock1_scenario=data.get('z_block_zblock1_scenario'),
             z_block_zblock1_run=data.get('z_block_zblock1_run'),
             now_zblock2_alt=data.get('now_zblock2_alt'),
