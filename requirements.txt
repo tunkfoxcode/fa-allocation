@@ -2,6 +2,7 @@ cachetools==5.5.2
 certifi==2025.11.12
 charset-normalizer==3.4.4
 db-dtypes==1.2.0
+fastapi==0.115.0
 google-api-core==2.28.1
 google-auth==2.25.2
 google-cloud-bigquery==3.14.1
@@ -25,3 +26,4 @@ rsa==4.9.1
 six==1.17.0
 tzdata==2025.3
 urllib3==2.6.2
+uvicorn[standard]==0.32.0

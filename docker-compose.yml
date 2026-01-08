@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  fa-allocation-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fa-allocation-api
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONPATH=/app
+    volumes:
+      - ./:/app
+      - /home/tunk/Desktop/fp-a-project-0c82aa55ae6a.json:/credentials/gcp-credentials.json:ro
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
