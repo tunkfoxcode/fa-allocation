@@ -270,6 +270,9 @@ def build_report(
     print("[INFO] Starting build_report")
 
     print(f"[INFO][Step 20] Using RepPage: {my_rep_page}")
+    
+    # Construct my_z_block_plan identifier from RepPage
+    my_z_block_plan = f"{my_rep_page.z_block_zblock_plan_source}-{my_rep_page.z_block_zblock_plan_pack}-{my_rep_page.z_block_zblock_plan_scenario}-{my_rep_page.z_block_zblock_plan_run}"
 
     # Step30 Query from RepTemp (REP_TEMP_TYPE = MyRepTemp)
     query_rep_temp = f"""
