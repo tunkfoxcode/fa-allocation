@@ -7,8 +7,9 @@ from datetime import datetime
 
 from app_config import get_settings
 from db.bigquery_connector import BigQueryConnector
-from calculate.report_runner import load_report, build_report
+from calculate.report_runner import load_report
 from models.report_models import RepPage
+from jobs.queue_manager import get_queue_manager
 
 # Configure logging
 logging.basicConfig(
@@ -50,7 +51,27 @@ class BuildReportRequest(BaseModel):
 class BuildReportResponse(BaseModel):
     status: str
     message: str
+    job_id: str
     data: dict
+
+
+class JobStatusResponse(BaseModel):
+    job_id: str
+    status: str
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    ended_at: Optional[str] = None
+    result: Optional[dict] = None
+    error: Optional[str] = None
+    progress: Optional[str] = None
+
+
+class QueueInfoResponse(BaseModel):
+    queue_name: str
+    queued_jobs: int
+    started_jobs: int
+    finished_jobs: int
+    failed_jobs: int
 
 
 class LoadReportRequest(BaseModel):
@@ -99,71 +120,60 @@ async def health_check():
 @app.post("/api/report/build", response_model=BuildReportResponse, tags=["Report"])
 async def api_build_report(request: BuildReportRequest):
     """
-    Build a new report by generating RepPage and RepCell records.
+    Enqueue a build report job (non-blocking).
+    
+    This endpoint immediately returns a job_id. The actual report building
+    happens in the background. Use /api/job/{job_id} to check status.
     
     This endpoint:
-    1. Creates or finds RepPage entry
-    2. Queries RepTemp and RepTempBlock configurations
-    3. Generates filter combinations (Cartesian product)
-    4. Queries SOCell data for Plan, Actual, and Forecast
-    5. Creates RepCell records for each combination and period
+    1. Validates request parameters
+    2. Enqueues job to Redis queue
+    3. Returns job_id immediately
+    
+    Background job will:
+    1. Create or find RepPage entry
+    2. Query RepTemp and RepTempBlock configurations
+    3. Generate filter combinations (Cartesian product)
+    4. Query SOCell data for Plan, Actual, and Forecast (optimized batch queries)
+    5. Create RepCell records for each combination and period
     
     Returns:
-        BuildReportResponse with RepPage identifier and metadata
+        BuildReportResponse with job_id for status tracking
     """
     try:
-        logger.info(f"Building report for: {request.my_rep_temp}, {request.my_z_block_plan}")
+        logger.info(f"Enqueueing build report job for: {request.my_rep_temp}, {request.my_z_block_plan}")
         
-        # Initialize BigQuery connector
-        bq = BigQueryConnector(
-            credentials_path=settings.GCP_CREDENTIALS_PATH,
-            project_id=settings.GCP_PROJECT_ID
-        )
+        # Get queue manager
+        queue_manager = get_queue_manager()
         
-        # Import here to avoid circular dependency
-        from calculate.report_runner import find_or_create_rep_page
-        
-        # Find or create RepPage
-        rep_page, is_newly_created = find_or_create_rep_page(
-            bq=bq,
+        # Enqueue job
+        job_id = queue_manager.enqueue_build_report(
             my_rep_temp=request.my_rep_temp,
             my_z_block_plan=request.my_z_block_plan,
             my_z_block_forecast=request.my_z_block_forecast,
             my_alt=request.my_alt,
             my_last_report_month=request.my_last_report_month,
-            my_last_actual_month=request.my_last_actual_month or request.my_last_report_month,
-            project_id=settings.GCP_PROJECT_ID,
-            report_dataset_name=settings.REPORT_DATASET_NAME,
-            rep_page_table_name=settings.REP_PAGE_TABLE_NAME
+            my_last_actual_month=request.my_last_actual_month or request.my_last_report_month
         )
         
-        # Build report
-        rep_page_identifier = build_report(
-            bq=bq,
-            my_rep_page=rep_page,
-            my_rep_temp=request.my_rep_temp,
-            my_last_report_month=request.my_last_report_month,
-            my_last_actual_month=request.my_last_actual_month or request.my_last_report_month,
-            project_id=settings.GCP_PROJECT_ID
-        )
-        
-        logger.info(f"Report built successfully: {rep_page_identifier}")
+        logger.info(f"Job enqueued successfully: {job_id}")
         
         return BuildReportResponse(
-            status="success",
-            message="Report built successfully",
+            status="queued",
+            message="Report build job enqueued successfully. Use job_id to check status.",
+            job_id=job_id,
             data={
-                "rep_page_identifier": rep_page_identifier,
-                "is_newly_created": is_newly_created,
-                "created_at": datetime.utcnow().isoformat()
+                "my_rep_temp": request.my_rep_temp,
+                "my_z_block_plan": request.my_z_block_plan,
+                "enqueued_at": datetime.utcnow().isoformat()
             }
         )
         
     except Exception as e:
-        logger.error(f"Error building report: {str(e)}", exc_info=True)
+        logger.error(f"Error enqueueing build report job: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to build report: {str(e)}"
+            detail=f"Failed to enqueue build report job: {str(e)}"
         )
 
 
@@ -217,6 +227,82 @@ async def api_load_report(request: LoadReportRequest):
 
 
 # Exception handlers
+@app.get("/api/job/{job_id}", response_model=JobStatusResponse, tags=["Job"])
+async def get_job_status(job_id: str):
+    """
+    Get status of a background job.
+    
+    Returns job status, progress, result, or error information.
+    
+    Status values:
+    - queued: Job is waiting in queue
+    - started: Job is currently running
+    - finished: Job completed successfully
+    - failed: Job failed with error
+    - not_found: Job ID not found
+    """
+    try:
+        queue_manager = get_queue_manager()
+        status_info = queue_manager.get_job_status(job_id)
+        
+        return JobStatusResponse(**status_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting job status: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get job status: {str(e)}"
+        )
+
+
+@app.get("/api/queue/info", response_model=QueueInfoResponse, tags=["Job"])
+async def get_queue_info():
+    """
+    Get queue statistics.
+    
+    Returns information about jobs in different states.
+    """
+    try:
+        queue_manager = get_queue_manager()
+        queue_info = queue_manager.get_queue_info()
+        
+        return QueueInfoResponse(**queue_info)
+        
+    except Exception as e:
+        logger.error(f"Error getting queue info: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get queue info: {str(e)}"
+        )
+
+
+@app.delete("/api/job/{job_id}", tags=["Job"])
+async def cancel_job(job_id: str):
+    """
+    Cancel a queued or running job.
+    """
+    try:
+        queue_manager = get_queue_manager()
+        success = queue_manager.cancel_job(job_id)
+        
+        if success:
+            return {"status": "success", "message": f"Job {job_id} cancelled"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job {job_id} not found or cannot be cancelled"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error cancelling job: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to cancel job: {str(e)}"
+        )
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
     return JSONResponse(
