@@ -186,7 +186,7 @@ def load_report(
             my_rep_temp=my_rep_temp,
             my_last_report_month=my_last_report_month,
             my_last_actual_month=my_last_actual_month,
-            project_id=project_id
+            project_id=settings.GCP_PROJECT_ID
         )
         
         print(f"[INFO] Report built successfully, loading RepCell data...")
