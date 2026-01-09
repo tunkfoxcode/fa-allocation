@@ -9,7 +9,7 @@ from app_config import get_settings
 from db.bigquery_connector import BigQueryConnector
 from calculate.report_runner import load_report
 from models.report_models import RepPage
-from jobs.queue_manager import get_queue_manager
+from jobs.memory_queue import get_job_queue
 
 # Configure logging
 logging.basicConfig(
@@ -29,6 +29,24 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+
+# Startup event to start background worker
+@app.on_event("startup")
+async def startup_event():
+    """Start the background job worker"""
+    job_queue = get_job_queue()
+    await job_queue.start_worker()
+    logger.info("Background job worker started")
+
+
+# Shutdown event to stop background worker
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop the background job worker"""
+    job_queue = get_job_queue()
+    await job_queue.stop_worker()
+    logger.info("Background job worker stopped")
 
 
 # Request/Response Models
@@ -143,11 +161,12 @@ async def api_build_report(request: BuildReportRequest):
     try:
         logger.info(f"Enqueueing build report job for: {request.my_rep_temp}, {request.my_z_block_plan}")
         
-        # Get queue manager
-        queue_manager = get_queue_manager()
+        # Get job queue
+        job_queue = get_job_queue()
         
         # Enqueue job
-        job_id = queue_manager.enqueue_build_report(
+        job_id = job_queue.enqueue_job(
+            task_name="build_report",
             my_rep_temp=request.my_rep_temp,
             my_z_block_plan=request.my_z_block_plan,
             my_z_block_forecast=request.my_z_block_forecast,
@@ -242,8 +261,8 @@ async def get_job_status(job_id: str):
     - not_found: Job ID not found
     """
     try:
-        queue_manager = get_queue_manager()
-        status_info = queue_manager.get_job_status(job_id)
+        job_queue = get_job_queue()
+        status_info = job_queue.get_job_status(job_id)
         
         return JobStatusResponse(**status_info)
         
@@ -263,8 +282,8 @@ async def get_queue_info():
     Returns information about jobs in different states.
     """
     try:
-        queue_manager = get_queue_manager()
-        queue_info = queue_manager.get_queue_info()
+        job_queue = get_job_queue()
+        queue_info = job_queue.get_queue_info()
         
         return QueueInfoResponse(**queue_info)
         
@@ -282,8 +301,8 @@ async def cancel_job(job_id: str):
     Cancel a queued or running job.
     """
     try:
-        queue_manager = get_queue_manager()
-        success = queue_manager.cancel_job(job_id)
+        job_queue = get_job_queue()
+        success = job_queue.cancel_job(job_id)
         
         if success:
             return {"status": "success", "message": f"Job {job_id} cancelled"}
