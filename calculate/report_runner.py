@@ -267,6 +267,7 @@ def build_report(
     Returns:
         str: RepPage identifier
     """
+    rep_page_identifier = f"{my_rep_page.z_block_zblock_plan_source}-{my_rep_page.z_block_zblock_plan_pack}-{my_rep_page.z_block_zblock_plan_scenario}-{my_rep_page.z_block_zblock_plan_run}"
     print("[INFO] Starting build_report")
 
     print(f"[INFO][Step 20] Using RepPage: {my_rep_page}")
@@ -680,7 +681,7 @@ def build_report(
                     y_number1=my_y_number_1,
                     y_number2=my_y_number_2,
                     y_number3=my_y_number_3,
-                    my_rep_page=my_rep_page.my_rep_temp,  # MyRepPage from my_z_block_plan
+                    my_rep_page=rep_page_identifier,  # MyRepPage from my_z_block_plan
                     my_rep_temp_block=my_rep_temp,  # MyRepTempBlock from my_rep_temp
                     z_block_type="Plan",
                     now_np=my_x_period,
@@ -777,7 +778,7 @@ def build_report(
                         y_number1=my_y_number_1,
                         y_number2=my_y_number_2,
                         y_number3=my_y_number_3,
-                        my_rep_page=my_rep_page.my_rep_temp,
+                        my_rep_page=rep_page_identifier,
                         my_rep_temp_block=my_rep_temp,
                         z_block_type="ActualForecast",
                         now_np=my_x_period,
@@ -811,7 +812,7 @@ def build_report(
                         y_number1=my_y_number_1,
                         y_number2=my_y_number_2,
                         y_number3=my_y_number_3,
-                        my_rep_page=my_rep_page.my_rep_temp,
+                        my_rep_page=rep_page_identifier,
                         my_rep_temp_block=my_rep_temp,
                         z_block_type="ActualForecast",
                         now_np=my_x_period,
@@ -840,6 +841,5 @@ def build_report(
                           f"now_value={so_cell3_now_value}")
     
     # Get RepPage identifier (using z_block_plan as identifier)
-    rep_page_identifier = f"{my_rep_page.z_block_zblock_plan_source}-{my_rep_page.z_block_zblock_plan_pack}-{my_rep_page.z_block_zblock_plan_scenario}-{my_rep_page.z_block_zblock_plan_run}"
     print(f"[INFO] build_report completed successfully. RepPage: {rep_page_identifier}")
     return rep_page_identifier
