@@ -16,7 +16,7 @@ services:
       
       # BigQuery settings
       - GCP_PROJECT_ID=${GCP_PROJECT_ID:-fp-a-project}
-      - GCP_CREDENTIALS_PATH=/app/credentials/fp-a-project.json
+      - GCP_CREDENTIALS_PATH=/app/credentials/fp-a-project-0c82aa55ae6a.json
       
       # Dataset names
       - REPORT_DATASET_NAME=${REPORT_DATASET_NAME:-Report_data}
