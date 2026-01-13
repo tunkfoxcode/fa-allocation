@@ -7,6 +7,76 @@ from app_config import get_settings
 settings = get_settings()
 
 
+def calculate_y_number1(
+    bq: BigQueryConnector,
+    project_id: str,
+    z_block_plan_source: str,
+    z_block_plan_pack: str,
+    z_block_plan_scenario: str,
+    z_block_plan_run: str,
+    z_block_forecast_source: str,
+    z_block_forecast_pack: str,
+    z_block_forecast_scenario: str,
+    z_block_forecast_run: str
+) -> int:
+    """
+    Calculate YNumber1 = ZBlockPlan.YNumber * 1000 + ZBlockForecast.YNumber
+    
+    Raises:
+        Exception: If unable to query or calculate YNumber1
+    
+    Returns:
+        int: Calculated YNumber1
+    """
+    try:
+        # Query ZBlockPlan.YNumber
+        query_zblock_plan = f"""
+        SELECT YNumber FROM `{project_id}.{settings.REPORT_CONFIG_DATASET_NAME}.ZBlock1_NativeTable` 
+        WHERE Z_BLOCK_ZBlockPlan_Source = '{z_block_plan_source}'
+        AND Z_BLOCK_ZBlockPlan_Pack = '{z_block_plan_pack}'
+        AND Z_BLOCK_ZBlockPlan_Scenario = '{z_block_plan_scenario}'
+        AND Z_BLOCK_ZBlockPlan_Run = '{z_block_plan_run}'
+        LIMIT 1
+        """
+        print(f"[INFO] Querying ZBlockPlan YNumber...")
+        zblock_plan_df = bq.execute_query(query_zblock_plan)
+        
+        if len(zblock_plan_df) == 0:
+            raise Exception(f"ZBlockPlan not found: {z_block_plan_source}-{z_block_plan_pack}-{z_block_plan_scenario}-{z_block_plan_run}")
+        
+        zblock_plan_ynumber = int(zblock_plan_df.iloc[0]['YNumber'])
+        print(f"[INFO] ZBlockPlan YNumber: {zblock_plan_ynumber}")
+        
+        # Query ZBlockForecast.YNumber
+        query_zblock_forecast = f"""
+        SELECT YNumber FROM `{project_id}.{settings.REPORT_CONFIG_DATASET_NAME}.ZBlock1_NativeTable` 
+        WHERE Z_BLOCK_ZBlockForecast_Source = '{z_block_forecast_source}'
+        AND Z_BLOCK_ZBlockForecast_Pack = '{z_block_forecast_pack}'
+        AND Z_BLOCK_ZBlockForecast_Scenario = '{z_block_forecast_scenario}'
+        AND Z_BLOCK_ZBlockForecast_Run = '{z_block_forecast_run}'
+        LIMIT 1
+        """
+        print(f"[INFO] Querying ZBlockForecast YNumber...")
+        zblock_forecast_df = bq.execute_query(query_zblock_forecast)
+        
+        if len(zblock_forecast_df) == 0:
+            raise Exception(f"ZBlockForecast not found: {z_block_forecast_source}-{z_block_forecast_pack}-{z_block_forecast_scenario}-{z_block_forecast_run}")
+        
+        zblock_forecast_ynumber = int(zblock_forecast_df.iloc[0]['YNumber'])
+        print(f"[INFO] ZBlockForecast YNumber: {zblock_forecast_ynumber}")
+        
+        # Calculate YNumber1
+        y_number1 = zblock_plan_ynumber * 1000 + zblock_forecast_ynumber
+        print(f"[INFO] Calculated YNumber1: {zblock_plan_ynumber} * 1000 + {zblock_forecast_ynumber} = {y_number1}")
+        
+        return y_number1
+        
+    except Exception as e:
+        error_msg = f"Failed to calculate YNumber1: {str(e)}"
+        print(f"[ERROR] {error_msg}")
+        raise Exception(error_msg)
+
+
 def find_or_create_rep_page(
         bq: BigQueryConnector,
         my_rep_temp: str,
@@ -103,9 +173,20 @@ def find_or_create_rep_page(
             time_x_block_upload_at=datetime.now()
         )
 
-        # Step21 RepPage.YNumber1 = ZBloickPlan.YNUmber * 1000 + ZBlockForecast.YNumber
-        # Q&A: ZBloickPlan.YNUmber? ZBlockForecast.YNumber?
-        my_rep_page.y_number1 = 1000
+        # Step21 RepPage.YNumber1 = ZBlockPlan.YNumber * 1000 + ZBlockForecast.YNumber
+        # Calculate YNumber1 using dedicated function (will raise exception if fails)
+        my_rep_page.y_number1 = calculate_y_number1(
+            bq=bq,
+            project_id=project_id,
+            z_block_plan_source=z_block_plan_source,
+            z_block_plan_pack=z_block_plan_pack,
+            z_block_plan_scenario=z_block_plan_scenario,
+            z_block_plan_run=z_block_plan_run,
+            z_block_forecast_source=z_block_forecast_source,
+            z_block_forecast_pack=z_block_forecast_pack,
+            z_block_forecast_scenario=z_block_forecast_scenario,
+            z_block_forecast_run=z_block_forecast_run
+        )
 
         success = bq.insert_row(
             dataset_id=report_dataset_name,
