@@ -9,6 +9,7 @@ from app_config import get_settings
 from db.bigquery_connector import BigQueryConnector
 from calculate.report_runner import load_report, build_report
 from models.report_models import RepPage
+from api.task_queue import task_queue_instance
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +29,17 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc"
 )
+
+# Start task queue worker on startup
+@app.on_event("startup")
+async def startup_event():
+    task_queue_instance.start_worker()
+    logger.info("Task queue worker started")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    task_queue_instance.stop_worker()
+    logger.info("Task queue worker stopped")
 
 
 # Request/Response Models
@@ -82,6 +94,12 @@ class LoadReportResponse(BaseModel):
     total_records: int
 
 
+class TaskStatusResponse(BaseModel):
+    status: str
+    message: str
+    task: Optional[dict] = None
+
+
 # API Endpoints
 @app.get("/health", response_model=HealthResponse, tags=["Health"])
 async def health_check():
@@ -99,71 +117,87 @@ async def health_check():
 @app.post("/api/report/build", response_model=BuildReportResponse, tags=["Report"])
 async def api_build_report(request: BuildReportRequest):
     """
-    Build a new report by generating RepPage and RepCell records.
+    Submit a report build task to the queue.
     
-    This endpoint:
-    1. Creates or finds RepPage entry
-    2. Queries RepTemp and RepTempBlock configurations
-    3. Generates filter combinations (Cartesian product)
-    4. Queries SOCell data for Plan, Actual, and Forecast
-    5. Creates RepCell records for each combination and period
+    This endpoint submits a task to build a report asynchronously.
+    The task will:
+    1. Create or find RepPage entry
+    2. Query RepTemp and RepTempBlock configurations
+    3. Generate filter combinations (Cartesian product)
+    4. Query SOCell data for Plan, Actual, and Forecast
+    5. Create RepCell records for each combination and period
     
     Returns:
-        BuildReportResponse with RepPage identifier and metadata
+        BuildReportResponse with task_id to track progress
     """
     try:
-        logger.info(f"Building report for: {request.my_rep_temp}, {request.my_z_block_plan}")
+        logger.info(f"Submitting build report task for: {request.my_rep_temp}, {request.my_z_block_plan}")
         
-        # Initialize BigQuery connector
-        bq = BigQueryConnector(
-            credentials_path=settings.GCP_CREDENTIALS_PATH,
-            project_id=settings.GCP_PROJECT_ID
+        # Submit task to queue
+        task_id = task_queue_instance.submit_task(
+            task_type="build_report",
+            params={
+                "my_rep_temp": request.my_rep_temp,
+                "my_z_block_plan": request.my_z_block_plan,
+                "my_z_block_forecast": request.my_z_block_forecast,
+                "my_alt": request.my_alt,
+                "my_last_report_month": request.my_last_report_month,
+                "my_last_actual_month": request.my_last_actual_month or request.my_last_report_month
+            }
         )
         
-        # Import here to avoid circular dependency
-        from calculate.report_runner import find_or_create_rep_page
-        
-        # Find or create RepPage
-        rep_page, is_newly_created = find_or_create_rep_page(
-            bq=bq,
-            my_rep_temp=request.my_rep_temp,
-            my_z_block_plan=request.my_z_block_plan,
-            my_z_block_forecast=request.my_z_block_forecast,
-            my_alt=request.my_alt,
-            my_last_report_month=request.my_last_report_month,
-            my_last_actual_month=request.my_last_actual_month or request.my_last_report_month,
-            project_id=settings.GCP_PROJECT_ID,
-            report_dataset_name=settings.REPORT_DATASET_NAME,
-            rep_page_table_name=settings.REP_PAGE_TABLE_NAME
-        )
-        
-        # Build report
-        rep_page_identifier = build_report(
-            bq=bq,
-            my_rep_page=rep_page,
-            my_rep_temp=request.my_rep_temp,
-            my_last_report_month=request.my_last_report_month,
-            my_last_actual_month=request.my_last_actual_month or request.my_last_report_month,
-            project_id=settings.GCP_PROJECT_ID
-        )
-        
-        logger.info(f"Report built successfully: {rep_page_identifier}")
+        logger.info(f"Task submitted successfully: {task_id}")
         
         return BuildReportResponse(
             status="success",
-            message="Report built successfully",
+            message="Report build task submitted successfully",
             data={
-                "rep_page_identifier": rep_page_identifier,
-                "is_newly_created": is_newly_created,
+                "task_id": task_id,
+                "status": "pending",
                 "created_at": datetime.utcnow().isoformat()
             }
         )
         
     except Exception as e:
-        logger.error(f"Error building report: {str(e)}", exc_info=True)
+        logger.error(f"Error submitting build report task: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to build report: {str(e)}"
+            detail=f"Failed to submit build report task: {str(e)}"
+        )
+
+
+@app.get("/api/task/{task_id}", response_model=TaskStatusResponse, tags=["Task"])
+async def get_task_status(task_id: str):
+    """
+    Get the status of a task by its ID.
+    
+    This endpoint allows you to check the progress and status of a build_report task.
+    
+    Returns:
+        TaskStatusResponse with task details including status, progress, result, or error
+    """
+    try:
+        task_status = task_queue_instance.get_task_status(task_id)
+        
+        if task_status is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Task not found: {task_id}"
+            )
+        
+        return TaskStatusResponse(
+            status="success",
+            message=f"Task status retrieved successfully",
+            task=task_status
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error retrieving task status: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve task status: {str(e)}"
         )
 
 
