@@ -66,7 +66,7 @@ def calculate_y_number1(
         print(f"[INFO] ZBlockForecast YNumber: {zblock_forecast_ynumber}")
         
         # Calculate YNumber1
-        y_number1 = zblock_plan_ynumber * 1000 + zblock_forecast_ynumber
+        y_number1 = zblock_plan_ynumber * 1000000 + zblock_forecast_ynumber
         print(f"[INFO] Calculated YNumber1: {zblock_plan_ynumber} * 1000 + {zblock_forecast_ynumber} = {y_number1}")
         
         return y_number1
@@ -369,34 +369,6 @@ def build_report(
 
     # Step31 MyZNumber = RepTemp.ZNumber
     my_z_number = my_rep_temp_item.z_number
-
-    # Step32 Query from RepPage(FK1= MyRepTemp, ZBlockPlan = MyZBlockPlan, ZBlockForecast=MyZBlockForecast, Alt = MyALT)
-
-    # SELECT * FROM
-    # `fp - a - project.Report_data.RepPage`
-    # WHERE
-    # FK1 = "KRF-L4.CDT0"  # MyRepTemp
-    #
-    # AND
-    # Z - Z - BLOCK_ZBlockPlan_Source = Z - BLOCK_ZBlockPlan_Source
-    # AND
-    # Z - BLOCK_ZBlockPlan_Pack = Z - BLOCK_ZBlockPlan_Pack
-    # AND
-    # Z - BLOCK_ZBlockPlan_Scenario = Z - BLOCK_ZBlockPlan_Scenario
-    # AND
-    # Z - BLOCK_ZBlockPlan_Run = Z - BLOCK_ZBlockPlan_Run
-    #
-    # AND
-    # ZBlockForecast_Source = ZBlockForecast_Source
-    # AND
-    # ZBlockForecast_Pack = ZBlockForecast_Pack
-    # AND
-    # ZBlockForecast_Scenario = ZBlockForecast_Scenario
-    # AND
-    # ZBlockForecast_Run = ZBlockForecast_Run
-    #
-    # AND
-    # NOW_ZBlock2_ALT = "PLA5"  # MyALT
 
     # Step33 MyYNumber1 = RepPage.YNumber1
     my_y_number_1 = my_rep_page.y_number1
