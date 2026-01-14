@@ -759,6 +759,58 @@ def build_report(
             bq, project_id, my_rep_temp_block
         )
 
+        # Field mappings (defined once, reused for all filter items)
+        kr_field_map = {
+            'NOW_Y_BLOCK_FNF_FNF': 'now_y_block_fnf_fnf',
+            'NOW_Y_BLOCK_KR_Item_Code_KR1': 'now_y_block_kr_item_code_kr1',
+            'NOW_Y_BLOCK_KR_Item_Code_KR2': 'now_y_block_kr_item_code_kr2',
+            'NOW_Y_BLOCK_KR_Item_Code_KR3': 'now_y_block_kr_item_code_kr3',
+            'NOW_Y_BLOCK_KR_Item_Code_KR4': 'now_y_block_kr_item_code_kr4',
+            'NOW_Y_BLOCK_KR_Item_Code_KR5': 'now_y_block_kr_item_code_kr5',
+            'NOW_Y_BLOCK_KR_Item_Code_KR6': 'now_y_block_kr_item_code_kr6',
+            'NOW_Y_BLOCK_KR_Item_Code_KR7': 'now_y_block_kr_item_code_kr7',
+            'NOW_Y_BLOCK_KR_Item_Code_KR8': 'now_y_block_kr_item_code_kr8',
+            'NOW_Y_BLOCK_KR_Item_Name': 'now_y_block_kr_item_name'
+        }
+        
+        filter_field_map = {
+            'NOW_Y_BLOCK_CDT_CDT1': 'now_y_block_cdt_cdt1',
+            'NOW_Y_BLOCK_CDT_CDT2': 'now_y_block_cdt_cdt2',
+            'NOW_Y_BLOCK_CDT_CDT3': 'now_y_block_cdt_cdt3',
+            'NOW_Y_BLOCK_CDT_CDT4': 'now_y_block_cdt_cdt4',
+            'NOW_Y_BLOCK_PTNow_PT1': 'now_y_block_ptnow_pt1',
+            'NOW_Y_BLOCK_PTNow_PT2': 'now_y_block_ptnow_pt2',
+            'NOW_Y_BLOCK_PTNow_Duration': 'now_y_block_ptnow_duration',
+            'NOW_Y_BLOCK_PTPrev_PT1': 'now_y_block_ptprev_pt1',
+            'NOW_Y_BLOCK_PTPrev_PT2': 'now_y_block_ptprev_pt2',
+            'NOW_Y_BLOCK_PTPrev_Duration': 'now_y_block_ptprev_duration',
+            'NOW_Y_BLOCK_PTFix_OwnType': 'now_y_block_ptfix_owntype',
+            'NOW_Y_BLOCK_PTFix_AIType': 'now_y_block_ptfix_aitype',
+            'NOW_Y_BLOCK_PTSub_CTY1': 'now_y_block_ptsub_cty1',
+            'NOW_Y_BLOCK_PTSub_CTY2': 'now_y_block_ptsub_cty2',
+            'NOW_Y_BLOCK_PTSub_OSType': 'now_y_block_ptsub_ostype',
+            'NOW_Y_BLOCK_Funnel_FU1': 'now_y_block_funnel_fu1',
+            'NOW_Y_BLOCK_Funnel_FU2': 'now_y_block_funnel_fu2',
+            'NOW_Y_BLOCK_Channel_CH': 'now_y_block_channel_ch',
+            'NOW_Y_BLOCK_Employee_EGT1': 'now_y_block_employee_egt1',
+            'NOW_Y_BLOCK_Employee_EGT2': 'now_y_block_employee_egt2',
+            'NOW_Y_BLOCK_Employee_EGT3': 'now_y_block_employee_egt3',
+            'NOW_Y_BLOCK_Employee_EGT4': 'now_y_block_employee_egt4',
+            'NOW_Y_BLOCK_HR_HR1': 'now_y_block_hr_hr1',
+            'NOW_Y_BLOCK_HR_HR2': 'now_y_block_hr_hr2',
+            'NOW_Y_BLOCK_HR_HR3': 'now_y_block_hr_hr3',
+            'NOW_Y_BLOCK_SEC': 'now_y_block_sec',
+            'NOW_Y_BLOCK_Period_MX': 'now_y_block_period_mx',
+            'NOW_Y_BLOCK_Period_DX': 'now_y_block_period_dx',
+            'NOW_Y_BLOCK_Period_PPC': 'now_y_block_period_ppc',
+            'NOW_Y_BLOCK_Period_NP': 'now_y_block_period_np',
+            'NOW_Y_BLOCK_LE_LE1': 'now_y_block_le_le1',
+            'NOW_Y_BLOCK_LE_LE2': 'now_y_block_le_le2',
+            'NOW_Y_BLOCK_UNIT': 'now_y_block_unit',
+            'NOW_Y_BLOCK_TD_BU': 'now_y_block_td_bu'
+        }
+
+        rep_cells_to_insert = []
         for my_filter_item in filter_combinations:
             # Step120 Foreach MyFilterItem
             l_items = [0, 1, 2, 3, 4, 5]
@@ -773,6 +825,8 @@ def build_report(
                 bq, project_id, my_rep_page, my_kr_type_full, my_filter_item, x_period_list
             )
             
+            # Collect RepCell records for batch insert
+
             # Now loop through each L and process the data
             for l in l_items:
                 my_x_period = x_period_list[l]
@@ -784,105 +838,42 @@ def build_report(
                 
                 print(f"[INFO][Step 140-180] L={l}, MyXPeriod={my_x_period}, Plan={so_cell1_now_value}, Actual={so_cell2_now_value}, Forecast={so_cell3_now_value}")
 
-                # Step190 Write to RepCell: Write Plan
-                # Create RepCell instance for Plan
+                # Step190 Create RepCell for Plan
                 rep_cell_plan = RepCell(
                     z_number=my_z_number,
                     y_number1=my_y_number_1,
                     y_number2=my_y_number_2,
                     y_number3=my_y_number_3,
-                    my_rep_page=rep_page_identifier,  # MyRepPage from my_z_block_plan
-                    my_rep_temp_block=my_rep_temp,  # MyRepTempBlock from my_rep_temp
+                    my_rep_page=rep_page_identifier,
+                    my_rep_temp_block=my_rep_temp,
                     z_block_type="Plan",
                     now_np=my_x_period,
                     now_value=so_cell1_now_value
                 )
 
-                # Populate KR fields from my_kr_type_full
-                kr_field_map = {
-                    'NOW_Y_BLOCK_FNF_FNF': 'now_y_block_fnf_fnf',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR1': 'now_y_block_kr_item_code_kr1',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR2': 'now_y_block_kr_item_code_kr2',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR3': 'now_y_block_kr_item_code_kr3',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR4': 'now_y_block_kr_item_code_kr4',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR5': 'now_y_block_kr_item_code_kr5',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR6': 'now_y_block_kr_item_code_kr6',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR7': 'now_y_block_kr_item_code_kr7',
-                    'NOW_Y_BLOCK_KR_Item_Code_KR8': 'now_y_block_kr_item_code_kr8',
-                    'NOW_Y_BLOCK_KR_Item_Name': 'now_y_block_kr_item_name'
-                }
-
                 for kr_field, kr_value in my_kr_type_full.items():
                     if kr_field in kr_field_map:
                         setattr(rep_cell_plan, kr_field_map[kr_field], kr_value)
-
-                # Populate filter fields from my_filter_item
-                filter_field_map = {
-                    'NOW_Y_BLOCK_CDT_CDT1': 'now_y_block_cdt_cdt1',
-                    'NOW_Y_BLOCK_CDT_CDT2': 'now_y_block_cdt_cdt2',
-                    'NOW_Y_BLOCK_CDT_CDT3': 'now_y_block_cdt_cdt3',
-                    'NOW_Y_BLOCK_CDT_CDT4': 'now_y_block_cdt_cdt4',
-                    'NOW_Y_BLOCK_PTNow_PT1': 'now_y_block_ptnow_pt1',
-                    'NOW_Y_BLOCK_PTNow_PT2': 'now_y_block_ptnow_pt2',
-                    'NOW_Y_BLOCK_PTNow_Duration': 'now_y_block_ptnow_duration',
-                    'NOW_Y_BLOCK_PTPrev_PT1': 'now_y_block_ptprev_pt1',
-                    'NOW_Y_BLOCK_PTPrev_PT2': 'now_y_block_ptprev_pt2',
-                    'NOW_Y_BLOCK_PTPrev_Duration': 'now_y_block_ptprev_duration',
-                    'NOW_Y_BLOCK_PTFix_OwnType': 'now_y_block_ptfix_owntype',
-                    'NOW_Y_BLOCK_PTFix_AIType': 'now_y_block_ptfix_aitype',
-                    'NOW_Y_BLOCK_PTSub_CTY1': 'now_y_block_ptsub_cty1',
-                    'NOW_Y_BLOCK_PTSub_CTY2': 'now_y_block_ptsub_cty2',
-                    'NOW_Y_BLOCK_PTSub_OSType': 'now_y_block_ptsub_ostype',
-                    'NOW_Y_BLOCK_Funnel_FU1': 'now_y_block_funnel_fu1',
-                    'NOW_Y_BLOCK_Funnel_FU2': 'now_y_block_funnel_fu2',
-                    'NOW_Y_BLOCK_Channel_CH': 'now_y_block_channel_ch',
-                    'NOW_Y_BLOCK_Employee_EGT1': 'now_y_block_employee_egt1',
-                    'NOW_Y_BLOCK_Employee_EGT2': 'now_y_block_employee_egt2',
-                    'NOW_Y_BLOCK_Employee_EGT3': 'now_y_block_employee_egt3',
-                    'NOW_Y_BLOCK_Employee_EGT4': 'now_y_block_employee_egt4',
-                    'NOW_Y_BLOCK_HR_HR1': 'now_y_block_hr_hr1',
-                    'NOW_Y_BLOCK_HR_HR2': 'now_y_block_hr_hr2',
-                    'NOW_Y_BLOCK_HR_HR3': 'now_y_block_hr_hr3',
-                    'NOW_Y_BLOCK_SEC': 'now_y_block_sec',
-                    'NOW_Y_BLOCK_Period_MX': 'now_y_block_period_mx',
-                    'NOW_Y_BLOCK_Period_DX': 'now_y_block_period_dx',
-                    'NOW_Y_BLOCK_Period_PPC': 'now_y_block_period_ppc',
-                    'NOW_Y_BLOCK_Period_NP': 'now_y_block_period_np',
-                    'NOW_Y_BLOCK_LE_LE1': 'now_y_block_le_le1',
-                    'NOW_Y_BLOCK_LE_LE2': 'now_y_block_le_le2',
-                    'NOW_Y_BLOCK_UNIT': 'now_y_block_unit',
-                    'NOW_Y_BLOCK_TD_BU': 'now_y_block_td_bu'
-                }
 
                 for filter_field, filter_value in my_filter_item.items():
                     if filter_field in filter_field_map:
                         setattr(rep_cell_plan, filter_field_map[filter_field], filter_value)
 
-                # Insert into BigQuery
-                bq.insert_row(
-                    dataset_id=settings.REPORT_DATASET_NAME,
-                    table_id=settings.REP_CELL_TABLE_NAME,
-                    row_data=rep_cell_plan.to_bigquery_dict()
-                )
-
-                print(f"[INFO][Step 190] Inserted RepCell (Plan): z_number={my_z_number}, "
+                rep_cells_to_insert.append(rep_cell_plan.to_bigquery_dict())
+                print(f"[INFO][Step 190] Prepared RepCell (Plan): z_number={my_z_number}, "
                       f"y_number1={my_y_number_1}, y_number2={my_y_number_2}, y_number3={my_y_number_3}, "
                       f"now_value={so_cell1_now_value}")
 
-                # Step200 Write to RepCell: ActualForecast (choose Actual or Forecast based on LastActualMonth)
-                # Compare LastActualMonth with MyXPeriod
-                # Format: M2504 (April 2025)
+                # Step200 Create RepCell for ActualForecast
                 last_actual_month_year = int(my_last_actual_month[1:3])
                 last_actual_month_month = int(my_last_actual_month[3:5])
                 my_x_period_year = int(my_x_period[1:3])
                 my_x_period_month = int(my_x_period[3:5])
 
-                # Convert to comparable format (total months)
                 last_actual_total = last_actual_month_year * 12 + last_actual_month_month
                 my_x_period_total = my_x_period_year * 12 + my_x_period_month
 
                 if last_actual_total >= my_x_period_total:
-                    # Use Actual data (SOCell2)
                     rep_cell_actual_forecast = RepCell(
                         z_number=my_z_number,
                         y_number1=my_y_number_1,
@@ -894,29 +885,10 @@ def build_report(
                         now_np=my_x_period,
                         now_value=so_cell2_now_value
                     )
-
-                    # Populate KR fields
-                    for kr_field, kr_value in my_kr_type_full.items():
-                        if kr_field in kr_field_map:
-                            setattr(rep_cell_actual_forecast, kr_field_map[kr_field], kr_value)
-
-                    # Populate filter fields
-                    for filter_field, filter_value in my_filter_item.items():
-                        if filter_field in filter_field_map:
-                            setattr(rep_cell_actual_forecast, filter_field_map[filter_field], filter_value)
-
-                    # Insert into BigQuery
-                    bq.insert_row(
-                        dataset_id=settings.REPORT_DATASET_NAME,
-                        table_id=settings.REP_CELL_TABLE_NAME,
-                        row_data=rep_cell_actual_forecast.to_bigquery_dict()
-                    )
-
-                    print(f"[INFO][Step 200] Inserted RepCell (ActualForecast-Actual): "
-                          f"LastActualMonth={my_last_report_month} >= MyXPeriod={my_x_period}, "
+                    print(f"[INFO][Step 200] Prepared RepCell (ActualForecast-Actual): "
+                          f"LastActualMonth={my_last_actual_month} >= MyXPeriod={my_x_period}, "
                           f"now_value={so_cell2_now_value}")
                 else:
-                    # Use Forecast data (SOCell3)
                     rep_cell_actual_forecast = RepCell(
                         z_number=my_z_number,
                         y_number1=my_y_number_1,
@@ -928,27 +900,28 @@ def build_report(
                         now_np=my_x_period,
                         now_value=so_cell3_now_value
                     )
-
-                    # Populate KR fields
-                    for kr_field, kr_value in my_kr_type_full.items():
-                        if kr_field in kr_field_map:
-                            setattr(rep_cell_actual_forecast, kr_field_map[kr_field], kr_value)
-
-                    # Populate filter fields
-                    for filter_field, filter_value in my_filter_item.items():
-                        if filter_field in filter_field_map:
-                            setattr(rep_cell_actual_forecast, filter_field_map[filter_field], filter_value)
-
-                    # Insert into BigQuery
-                    bq.insert_row(
-                        dataset_id=settings.REPORT_DATASET_NAME,
-                        table_id=settings.REP_CELL_TABLE_NAME,
-                        row_data=rep_cell_actual_forecast.to_bigquery_dict()
-                    )
-
-                    print(f"[INFO][Step 200] Inserted RepCell (ActualForecast-Forecast): "
-                          f"LastActualMonth={my_last_report_month} < MyXPeriod={my_x_period}, "
+                    print(f"[INFO][Step 200] Prepared RepCell (ActualForecast-Forecast): "
+                          f"LastActualMonth={my_last_actual_month} < MyXPeriod={my_x_period}, "
                           f"now_value={so_cell3_now_value}")
+
+                for kr_field, kr_value in my_kr_type_full.items():
+                    if kr_field in kr_field_map:
+                        setattr(rep_cell_actual_forecast, kr_field_map[kr_field], kr_value)
+
+                for filter_field, filter_value in my_filter_item.items():
+                    if filter_field in filter_field_map:
+                        setattr(rep_cell_actual_forecast, filter_field_map[filter_field], filter_value)
+
+                rep_cells_to_insert.append(rep_cell_actual_forecast.to_bigquery_dict())
+            
+            # Batch insert all RepCell records for this filter_item
+        if rep_cells_to_insert:
+            bq.insert_rows(
+                dataset_id=settings.REPORT_DATASET_NAME,
+                table_id=settings.REP_CELL_TABLE_NAME,
+                rows_data=rep_cells_to_insert
+            )
+            print(f"[INFO][Step 190-200] Batch inserted {len(rep_cells_to_insert)} RepCell records for filter_item")
     
     # Get RepPage identifier (using z_block_plan as identifier)
     print(f"[INFO] build_report completed successfully. RepPage: {rep_page_identifier}")

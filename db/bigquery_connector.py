@@ -127,3 +127,53 @@ class BigQueryConnector:
         except Exception as e:
             print(f"✗ Error when inserting row: {str(e)}")
             return False
+
+    def insert_rows(self, dataset_id, table_id, rows_data):
+        """
+        Insert multiple rows vào BigQuery table (batch insert)
+
+        Args:
+            dataset_id: Dataset ID
+            table_id: Table ID
+            rows_data: List of dictionaries chứa dữ liệu cần insert
+
+        Returns:
+            True nếu insert thành công, False nếu có lỗi
+        """
+        try:
+            from decimal import Decimal
+            from datetime import datetime, date
+
+            table_ref = f"{self.client.project}.{dataset_id}.{table_id}"
+            table = self.client.get_table(table_ref)
+
+            def convert_decimals(obj):
+                if isinstance(obj, dict):
+                    return {k: convert_decimals(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [convert_decimals(item) for item in obj]
+                elif isinstance(obj, Decimal):
+                    return round(float(obj), 9)
+                elif isinstance(obj, float):
+                    return round(obj, 9)
+                elif isinstance(obj, datetime):
+                    return obj.isoformat()
+                elif isinstance(obj, date):
+                    return obj.isoformat()
+                else:
+                    return obj
+
+            rows_dict = [convert_decimals(row) for row in rows_data]
+
+            errors = self.client.insert_rows_json(table, rows_dict)
+
+            if errors:
+                print(f"✗ Errors occurred while inserting rows: {errors}")
+                return False
+            else:
+                print(f"✓ Successfully inserted {len(rows_dict)} rows into {table_ref}")
+                return True
+
+        except Exception as e:
+            print(f"✗ Error when inserting rows: {str(e)}")
+            return False
