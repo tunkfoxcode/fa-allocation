@@ -688,6 +688,8 @@ def build_report(
         my_last_actual_month: str,
         project_id: str
 ) -> str:
+    #Step30A
+    my_last_report_month = "M3012"
     """
     Build a new report by generating RepCell records.
     
@@ -813,8 +815,7 @@ def build_report(
         rep_cells_to_insert = []
         for my_filter_item in filter_combinations:
             # Step120 Foreach MyFilterItem
-            l_items = [0, 1, 2, 3, 4, 5]
-            # l_items = list(range(120))
+            l_items = list(range(120))
             
             # Step140 Calculate all MyXPeriod values for all L values
             x_period_list = [calculate_x_period(my_last_report_month, l) for l in l_items]
