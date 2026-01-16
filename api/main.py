@@ -218,16 +218,16 @@ async def api_load_report(request: LoadReportRequest):
     
     This endpoint checks if a report exists for the given parameters.
     If the report exists (RepPage found with RepCell data), it returns the array of RepCell data.
-    If not, it automatically calls build_report to generate the report first, then returns the RepCell data.
+    If not, it submits a build task to the queue and returns empty data with task_id.
     
     Returns:
-        LoadReportResponse with array of RepCell records
+        LoadReportResponse with array of RepCell records or task_id if building
     """
     try:
         logger.info(f"Loading report for: {request.my_rep_temp}, {request.my_z_block_plan}")
         
-        # Call load_report function
-        rep_cells = load_report(
+        # Call load_report function - returns (rep_cells, task_id, message)
+        rep_cells, task_id, message = load_report(
             my_rep_temp=request.my_rep_temp,
             my_z_block_plan=request.my_z_block_plan,
             my_z_block_forecast=request.my_z_block_forecast,
@@ -239,15 +239,24 @@ async def api_load_report(request: LoadReportRequest):
         # Convert RepCell objects to dictionaries
         rep_cells_data = [cell.to_bigquery_dict() for cell in rep_cells]
         
-        logger.info(f"Report loaded successfully: {len(rep_cells)} records")
+        # Prepare response data
+        response_data = {
+            "my_rep_page": request.my_z_block_plan,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+        # If task_id exists, add it to response data
+        if task_id:
+            response_data["task_id"] = task_id
+            response_data["status"] = "building"
+            logger.info(f"Report build task submitted: {task_id}")
+        else:
+            logger.info(f"Report loaded successfully: {len(rep_cells)} records")
         
         return LoadReportResponse(
             status="success",
-            message=f"Report loaded successfully with {len(rep_cells)} records",
-            data={
-                "my_rep_page": request.my_z_block_plan,
-                "generated_at": datetime.utcnow().isoformat()
-            },
+            message=message,
+            data=response_data,
             rep_cells=rep_cells_data,
             total_records=len(rep_cells)
         )

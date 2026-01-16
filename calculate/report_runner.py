@@ -1,7 +1,7 @@
 from db.bigquery_connector import BigQueryConnector
 from models.report_models import RepPage, RepTemp, RepTempBlock, RepCell
 from datetime import datetime
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional
 from itertools import product
 from app_config import get_settings
 
@@ -586,16 +586,17 @@ def load_report(
         my_alt: str,
         my_last_report_month: str,
         my_last_actual_month: str = None
-) -> List[RepCell]:
+) -> Tuple[List[RepCell], Optional[str], str]:
     """
     Main entry point for loading report data.
     
     This function:
     1. Finds or creates RepPage
-    2. If newly created, builds report and loads RepCell data
-    3. If already exists, checks for RepCell data:
-       - If exists: loads and returns
-       - If not exists: builds report and loads RepCell data
+    2. If newly created or RepCell data doesn't exist:
+       - Submits build task to queue
+       - Returns empty list with task_id and message
+    3. If RepCell data exists:
+       - Loads and returns RepCell data
     
     Args:
         my_rep_temp: Report template name
@@ -606,7 +607,9 @@ def load_report(
         my_last_actual_month: Last actual month (optional)
     
     Returns:
-        List[RepCell]: Array of RepCell records
+        Tuple[List[RepCell], Optional[str], str]: (rep_cells, task_id, message)
+        - If data exists: (rep_cells, None, "success")
+        - If building: ([], task_id, "building")
     """
     print("[INFO] Starting load_report")
     
@@ -633,68 +636,66 @@ def load_report(
     
     print(f"[INFO] Using RepPage: {existing_rep_page} (newly_created={is_newly_created})")
     
-    # Step 2: Branch based on whether RepPage was newly created
+    # Step 2: Check if RepCell data exists
+    need_to_build = False
+    
     if is_newly_created:
         # RepPage just created - definitely need to build report
-        print(f"[INFO] RepPage newly created, building report...")
+        print(f"[INFO] RepPage newly created, need to build report")
+        need_to_build = True
+    
+    # Step 3: If need to build, submit task to queue and return empty with task_id
+    if need_to_build:
+        from api.task_queue import task_queue_instance
         
-        build_report(
-            bq=bq,
-            my_rep_page=existing_rep_page,
-            my_rep_temp=my_rep_temp,
-            my_last_report_month=my_last_report_month,
-            my_last_actual_month=my_last_actual_month,
-            project_id=settings.GCP_PROJECT_ID
+        print(f"[INFO] Submitting build report task to queue...")
+        task_id = task_queue_instance.submit_task(
+            task_type="build_report",
+            params={
+                "my_rep_temp": my_rep_temp,
+                "my_z_block_plan": my_z_block_plan,
+                "my_z_block_forecast": my_z_block_forecast,
+                "my_alt": my_alt,
+                "my_last_report_month": my_last_report_month,
+                "my_last_actual_month": my_last_actual_month or my_last_report_month
+            }
         )
         
-        print(f"[INFO] Report built successfully, loading RepCell data...")
-    else:
-        # RepPage already existed - check if RepCell data exists
-        print(f"[INFO] RepPage already exists, checking for RepCell data...")
-        query_check_rep_cell = f"""
-        SELECT COUNT(*) as count
-        FROM `{settings.GCP_PROJECT_ID}.{settings.REPORT_DATASET_NAME}.{settings.REP_CELL_TABLE_NAME}` 
-        WHERE MyRepPage = '{my_z_block_plan}'
-        """
-        
-        check_df = bq.execute_query(query_check_rep_cell)
-        rep_cell_count = check_df.iloc[0]['count'] if len(check_df) > 0 else 0
-        
-        if rep_cell_count == 0:
-            # RepCell data doesn't exist - need to build report
-            print(f"[INFO] No RepCell data found, building report...")
-            
-            build_report(
-                bq=bq,
-                my_rep_page=existing_rep_page,
-                my_rep_temp=my_rep_temp,
-                my_last_report_month=my_last_report_month,
-                my_last_actual_month=my_last_actual_month,
-                project_id=settings.GCP_PROJECT_ID
-            )
-            
-            print(f"[INFO] Report built successfully, loading RepCell data...")
-        else:
-            print(f"[INFO] Found existing {rep_cell_count} RepCell records")
+        print(f"[INFO] Build task submitted with task_id: {task_id}")
+        return [], task_id, "Report is being built. Please check task status."
     
-    # Step 3: Load and return RepCell data
-    print(f"[INFO] Loading RepCell data for RepPage: {my_z_block_plan}")
+    # Step 4: Calculate MyXPeriodLoadList for 6 recent months (M from 0 to 5)
+    my_x_period_load_list = []
+    for m in range(6):
+        my_x_period_load = calculate_x_period(my_last_report_month, m)
+        my_x_period_load_list.append(my_x_period_load)
+    
+    print(f"[INFO] Calculated MyXPeriodLoadList: {my_x_period_load_list}")
+    
+    # Step 5: Load and return RepCell data using YNumber1 and NOW_NP IN clause
+    y_number_1 = existing_rep_page.y_number1
+    print(f"[INFO] Loading RepCell data for YNumber1: {y_number_1}")
+    
+    # Build IN clause for periods
+    period_in_clause = "', '".join(my_x_period_load_list)
+    
     query_rep_cell = f"""
     SELECT * 
     FROM `{settings.GCP_PROJECT_ID}.{settings.REPORT_DATASET_NAME}.{settings.REP_CELL_TABLE_NAME}` 
-    WHERE MyRepPage = '{my_z_block_plan}'
+    WHERE YNumber1 = {y_number_1}
+    AND NOW_NP IN ('{period_in_clause}')
     ORDER BY YNumber2, YNumber3, Z_BLOCK_TYPE
     """
     
     rep_cell_df = bq.execute_query(query_rep_cell)
     
     if len(rep_cell_df) == 0:
-        print(f"[WARN] No RepCell data found for RepPage: {my_z_block_plan}")
-        return []
+        print(f"[WARN] No RepCell data found for YNumber1: {y_number_1}")
+        return [], None, "No data found"
     
     rep_cells = RepCell.from_dataframe(rep_cell_df)
     print(f"[INFO] Successfully loaded {len(rep_cells)} RepCell records")
-    return rep_cells
+    return rep_cells, None, "Data loaded successfully"
 
 
 def build_report(
