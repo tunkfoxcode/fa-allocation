@@ -377,10 +377,11 @@ def calculate_y_number1(
     z_block_forecast_source: str,
     z_block_forecast_pack: str,
     z_block_forecast_scenario: str,
-    z_block_forecast_run: str
+    z_block_forecast_run: str,
+    my_alt: str
 ) -> int:
     """
-    Calculate YNumber1 = ZBlockPlan.YNumber * 1000 + ZBlockForecast.YNumber
+    Calculate YNumber1 = ZBlockPlan.YNumber * 1000000 + ZBlockForecast.YNumber * 1000 + MyALT.YNumber
     
     Raises:
         Exception: If unable to query or calculate YNumber1
@@ -425,9 +426,24 @@ def calculate_y_number1(
         zblock_forecast_ynumber = int(zblock_forecast_df.iloc[0]['YNumber'])
         print(f"[INFO] ZBlockForecast YNumber: {zblock_forecast_ynumber}")
         
+        # Query MyALT.YNumber
+        query_alt = f"""
+        SELECT YNumber FROM `{project_id}.{settings.REPORT_CONFIG_DATASET_NAME}.ZBlock1_NativeTable` 
+        WHERE NOW_ZBlock2_ALT = '{my_alt}'
+        LIMIT 1
+        """
+        print(f"[INFO] Querying MyALT YNumber for: {my_alt}...")
+        alt_df = bq.execute_query(query_alt)
+        
+        if len(alt_df) == 0:
+            raise Exception(f"MyALT not found: {my_alt}")
+        
+        alt_ynumber = int(alt_df.iloc[0]['YNumber'])
+        print(f"[INFO] MyALT YNumber: {alt_ynumber}")
+        
         # Calculate YNumber1
-        y_number1 = zblock_plan_ynumber * 1000000 + zblock_forecast_ynumber
-        print(f"[INFO] Calculated YNumber1: {zblock_plan_ynumber} * 1000 + {zblock_forecast_ynumber} = {y_number1}")
+        y_number1 = zblock_plan_ynumber * 1000000 + zblock_forecast_ynumber * 1000 + alt_ynumber
+        print(f"[INFO] Calculated YNumber1: {zblock_plan_ynumber} * 1000000 + {zblock_forecast_ynumber} * 1000 + {alt_ynumber} = {y_number1}")
         
         return y_number1
         
@@ -533,7 +549,7 @@ def find_or_create_rep_page(
             time_x_block_upload_at=datetime.now()
         )
 
-        # Step21 RepPage.YNumber1 = ZBlockPlan.YNumber * 1000 + ZBlockForecast.YNumber
+        # Step21 RepPage.YNumber1 = ZBlockPlan.YNumber * 1000000 + ZBlockForecast.YNumber * 1000 + MyALT.YNumber
         # Calculate YNumber1 using dedicated function (will raise exception if fails)
         my_rep_page.y_number1 = calculate_y_number1(
             bq=bq,
@@ -545,7 +561,8 @@ def find_or_create_rep_page(
             z_block_forecast_source=z_block_forecast_source,
             z_block_forecast_pack=z_block_forecast_pack,
             z_block_forecast_scenario=z_block_forecast_scenario,
-            z_block_forecast_run=z_block_forecast_run
+            z_block_forecast_run=z_block_forecast_run,
+            my_alt=my_alt
         )
 
         success = bq.insert_row(
