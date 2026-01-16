@@ -188,7 +188,8 @@ def query_so_cell_data(
     my_rep_page,
     my_kr_type_full: Dict[str, str],
     my_filter_item: Dict[str, str],
-    x_period_list: List[str]
+    x_period_list: List[str],
+    my_alt: str
 ) -> Tuple[Dict[str, any], Dict[str, any], Dict[str, any]]:
     """
     Query SOCell data for Plan, Actual, and Forecast scenarios for all periods.
@@ -200,6 +201,7 @@ def query_so_cell_data(
         my_kr_type_full: Dictionary of KR-related fields
         my_filter_item: Dictionary of filter items
         x_period_list: List of period strings to query
+        my_alt: ALT identifier for NOW_ZBlock2_ALT filter
         
     Returns:
         Tuple containing:
@@ -287,6 +289,7 @@ def query_so_cell_data(
             where_conditions.append(f"{so_cell_field} = '{filter_value}'")
     
     where_conditions.append(f"now_np IN ('{periods_str}')")
+    where_conditions.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
     
     query_so_cell = f"""
     SELECT now_np, now_value 
@@ -313,6 +316,7 @@ def query_so_cell_data(
             where_conditions_actual.append(f"{so_cell_field} = '{filter_value}'")
     
     where_conditions_actual.append(f"now_np IN ('{periods_str}')")
+    where_conditions_actual.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
     
     query_so_cell_actual = f"""
     SELECT now_np, now_value 
@@ -352,6 +356,7 @@ def query_so_cell_data(
             where_conditions_forecast.append(f"{so_cell_field} = '{filter_value}'")
     
     where_conditions_forecast.append(f"now_np IN ('{periods_str}')")
+    where_conditions_forecast.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
     
     query_so_cell_forecast = f"""
     SELECT now_np, now_value 
@@ -841,7 +846,7 @@ def build_report(
             
             # Step160-180 Query all SOCell data at once
             plan_data, actual_data, forecast_data = query_so_cell_data(
-                bq, project_id, my_rep_page, my_kr_type_full, my_filter_item, x_period_list
+                bq, project_id, my_rep_page, my_kr_type_full, my_filter_item, x_period_list, my_rep_page.now_zblock2_alt
             )
             
             # Collect RepCell records for batch insert
