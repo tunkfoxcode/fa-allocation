@@ -67,7 +67,7 @@ def build_filter_and_kr_data(
         'NOW_Y_BLOCK_LE_LE1': my_rep_temp_block.now_y_block_le_le1,
         'NOW_Y_BLOCK_LE_LE2': my_rep_temp_block.now_y_block_le_le2,
         'NOW_Y_BLOCK_UNIT': my_rep_temp_block.now_y_block_unit,
-        'NOW_Y_BLOCK_TD_BU': my_rep_temp_block.now_y_block_td_bu
+        # 'NOW_Y_BLOCK_TD_BU': my_rep_temp_block.now_y_block_td_bu
     }
 
     field_map = {k: v for k, v in field_map.items() if v is not None}
@@ -764,6 +764,7 @@ def build_report(
     SELECT * 
     FROM `{project_id}.{settings.REPORT_CONFIG_DATASET_NAME}.{settings.REP_TEMP_BLOCK_TABLE_NAME}` 
     WHERE MyRepTemp = '{my_rep_temp}'
+    ORDER BY ynumber2
     """
 
     rep_temp_block_df = bq.execute_query(query_rep_temp_block)
