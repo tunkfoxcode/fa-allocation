@@ -677,9 +677,10 @@ def load_report(
     
     print(f"[INFO] Calculated MyXPeriodLoadList: {my_x_period_load_list}")
     
-    # Step 5: Load and return RepCell data using YNumber1 and NOW_NP IN clause
+    # Step 5: Load and return RepCell data using YNumber1, MyRepTempBlock, and NOW_NP IN clause
     y_number_1 = existing_rep_page.y_number1
-    print(f"[INFO] Loading RepCell data for YNumber1: {y_number_1}")
+    my_rep_temp_value = existing_rep_page.my_rep_temp
+    print(f"[INFO] Loading RepCell data for YNumber1: {y_number_1}, MyRepTempBlock: {my_rep_temp_value}")
     
     # Build IN clause for periods
     period_in_clause = "', '".join(my_x_period_load_list)
@@ -688,6 +689,7 @@ def load_report(
     SELECT * 
     FROM `{settings.GCP_PROJECT_ID}.{settings.REPORT_DATASET_NAME}.{settings.REP_CELL_TABLE_NAME}` 
     WHERE YNumber1 = {y_number_1}
+    AND MyRepTempBlock = '{my_rep_temp_value}'
     AND NOW_NP IN ('{period_in_clause}')
     ORDER BY YNumber2, YNumber3, Z_BLOCK_TYPE
     """
@@ -695,7 +697,7 @@ def load_report(
     rep_cell_df = bq.execute_query(query_rep_cell)
     
     if len(rep_cell_df) == 0:
-        print(f"[WARN] No RepCell data found for YNumber1: {y_number_1}")
+        print(f"[WARN] No RepCell data found for YNumber1: {y_number_1}, MyRepTempBlock: {my_rep_temp_value}")
         return [], None, "No data found"
     
     rep_cells = RepCell.from_dataframe(rep_cell_df)
