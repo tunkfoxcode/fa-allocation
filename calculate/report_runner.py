@@ -837,7 +837,12 @@ def build_report(
         }
 
         rep_cells_to_insert = []
-        for my_filter_item in filter_combinations:
+        
+        # If filter_combinations is empty, create a list with one empty dict to run the logic once without filters
+        filter_items_to_process = filter_combinations if filter_combinations else [{}]
+        print(f"[INFO] Processing {len(filter_items_to_process)} filter combinations (empty={len(filter_combinations)==0})")
+        
+        for my_filter_item in filter_items_to_process:
             # Step120 Foreach MyFilterItem
             l_items = list(range(120))
             
