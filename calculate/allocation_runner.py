@@ -7,8 +7,13 @@ from queries.query_builder import (
     build_so_cell_by_kr_query, 
     build_so_cell_prev_query,
     build_so_cell_batch_query,
+    build_so_cell_prev_batch_query,
+    build_so_cell_by_kr_batch_query,
     create_allocation_key,
-    group_socell_by_allocation
+    group_socell_by_allocation,
+    create_prev_socell_key,
+    group_prev_socell_by_key,
+    group_by_percent_results
 )
 from utils.period_utils import add_period_strings
 from services.allocation_service import calculate_offset
@@ -305,6 +310,9 @@ def run_allocate(
                 continue
             print(f"[INFO][Step 30] Start process each my_allocation_alt_item: {my_allocation_alt_item}")
 
+            # Initialize list to collect all insert records for batch insert
+            batch_insert_records = []
+
             # Query AllocationToItem and AllocationByType
             #Step35-Step50
             my_to_items, my_allocation_by_type_items = query_allocation_items(
@@ -315,6 +323,49 @@ def run_allocate(
                 allocation_by_type_table_name=allocation_by_type_table_name,
                 my_allocation_alt_item=my_allocation_alt_item
             )
+
+            # Step55: Batch query all allocation_by_kr items for this alt_item
+            print(f"[INFO][Step 55] Building batch query for allocation_by_kr items")
+            my_from_type = my_allocation_alt_item.from_type
+            my_to_type = my_allocation_alt_item.to_type
+            
+            # Get unique by_types from allocation_by_type_items
+            by_types = set()
+            for item in my_allocation_by_type_items:
+                if item.by_block_by_type and item.by_block_by_type not in ['GAgg', 'ByAgg']:
+                    # Only include numeric by_types
+                    if str(item.by_block_by_type).lstrip('-').isdigit():
+                        continue
+                    by_types.add(item.by_block_by_type)
+            
+            if by_types:
+                by_types_list = list(by_types)
+                by_types_in_clause = "', '".join(by_types_list)
+                
+                query_allocation_by_kr_batch = f"""
+                SELECT * 
+                FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}` 
+                WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
+                AND TO_Y_BLOCK_KR4 = '{my_to_type}'
+                AND BY_BLOCK_ByType IN ('{by_types_in_clause}')
+                """
+                
+                print(f"[INFO][Step 55] Executing batch allocation_by_kr query for {len(by_types)} by_types")
+                allocation_by_kr_raw = bq.execute_query(query_allocation_by_kr_batch)
+                all_allocation_by_kr_items = AllocationByKR.from_dataframe(allocation_by_kr_raw)
+                print(f"[INFO][Step 55] Batch query returned {len(all_allocation_by_kr_items)} allocation_by_kr items")
+                
+                # Create map: (from_type, to_type, by_type) -> allocation_by_kr_item
+                allocation_by_kr_map = {}
+                for kr_item in all_allocation_by_kr_items:
+                    key = (my_from_type, my_to_type, kr_item.by_block_by_type)
+                    if key not in allocation_by_kr_map:
+                        allocation_by_kr_map[key] = kr_item
+                
+                print(f"[INFO][Step 55] Created allocation_by_kr_map with {len(allocation_by_kr_map)} keys")
+            else:
+                allocation_by_kr_map = {}
+                print(f"[INFO][Step 55] No valid by_types found, allocation_by_kr_map is empty")
 
             # Step60: Process ByAgg types first
             for my_allocation_by_type_item in my_allocation_by_type_items:
@@ -369,26 +420,46 @@ def run_allocate(
                 from_so_cell_items = so_cell_map.get(allocation_key, [])
                 print(f"[INFO][Step 80] Found {len(from_so_cell_items)} SoCell items for key: {allocation_key[:100]}...")
 
+                if not from_so_cell_items:
+                    print(f"[INFO][Step 80] No SoCell items found, skipping")
+                    continue
+
+                # Step90: Batch query all prev SoCells for this allocation_by_type_item
+                print(f"[INFO][Step 90] Building batch query for {len(from_so_cell_items)} prev SoCells")
+                query_so_cell_prev_batch = build_so_cell_prev_batch_query(
+                    from_so_cell_items=from_so_cell_items,
+                    z_number=my_allocation_alt_item.z_number,
+                    project_id=project_id,
+                    dataset_id=alloc_data_dataset_name,
+                    table_id=so_cell_table_name
+                )
+                
+                if query_so_cell_prev_batch is None:
+                    print(f"[WARN][Step 90] No valid prev query conditions, skipping")
+                    continue
+                
+                print(f"[INFO][Step 90] Executing batch prev query")
+                so_cell_prev_raw = bq.execute_query(query_so_cell_prev_batch)
+                all_prev_so_cell_items = SoCell.from_dataframe(so_cell_prev_raw)
+                print(f"[INFO][Step 90] Batch prev query returned {len(all_prev_so_cell_items)} prev SoCell items")
+                
+                # Group prev SoCell items by key for fast lookup
+                prev_so_cell_map = group_prev_socell_by_key(all_prev_so_cell_items)
+                print(f"[INFO][Step 90] Grouped prev SoCells into {len(prev_so_cell_map)} unique keys")
+
+                # Step100: Process each from_so_cell_item using the prev map
                 for from_so_cell_item in from_so_cell_items:
-                    print(f"[INFO][Step 80] Start processing for each from_so_cell_item: {from_so_cell_item}")
+                    print(f"[INFO][Step 100] Start processing for each from_so_cell_item: {from_so_cell_item}")
                     y_block_1 = from_so_cell_item
                     x_period_1 = from_so_cell_item.now_np
                     value_1 = from_so_cell_item.now_value
                     print(
-                        f"[INFO][Step 80] We have y_block_1: {y_block_1}, x_period_1: {x_period_1}, value_1: {value_1}")
+                        f"[INFO][Step 100] We have y_block_1: {y_block_1}, x_period_1: {x_period_1}, value_1: {value_1}")
 
-                    query_so_cell_prev = build_so_cell_prev_query(
-                        y_block_1=y_block_1,
-                        x_period_1=x_period_1,
-                        z_number=my_allocation_alt_item.z_number,
-                        project_id=project_id,
-                        dataset_id=alloc_data_dataset_name,
-                        table_id=so_cell_table_name
-                    )
-                    so_cell_raw = bq.execute_query(query_so_cell_prev)
-                    so_cells_prev_y_block = SoCell.from_dataframe(so_cell_raw)
-                    print(
-                        f"[INFO][Step 110] We having {len(so_cells_prev_y_block)} so_cells_prev_y_block by query: \n {query_so_cell_prev}")
+                    # Lookup prev SoCell items from map using key
+                    prev_key = create_prev_socell_key(y_block_1)
+                    so_cells_prev_y_block = prev_so_cell_map.get(prev_key, [])
+                    print(f"[INFO][Step 110] Found {len(so_cells_prev_y_block)} prev SoCell items for key: {prev_key[:100]}...")
 
                     if len(so_cells_prev_y_block) > 0:
                         print("[WARN][Step 120] Skip process because so_cells_prev_y_block is empty (N=0)")
@@ -408,57 +479,56 @@ def run_allocate(
                         )
                         continue
 
-                    my_from_type = my_allocation_alt_item.from_type
-                    my_to_type = my_allocation_alt_item.to_type
+                    # Lookup allocation_by_kr from map instead of querying
                     my_by_type = my_allocation_by_type_item.by_block_by_type
-
-                    query_allocation_by_kr = f"""
-                    SELECT * 
-                    FROM `{project_id}.{allocation_config_dataset_name}.{allocation_by_kr_table_name}` 
-                    WHERE TO_Y_BLOCK_KR6 = '{my_from_type}'
-                    AND TO_Y_BLOCK_KR4 = '{my_to_type}'
-                    AND BY_BLOCK_ByType = '{my_by_type}'
-                    """
-                    allocation_by_kr_raw = bq.execute_query(query_allocation_by_kr)
-                    allocation_by_kr_items = AllocationByKR.from_dataframe(allocation_by_kr_raw)
-
-                    print(
-                        f"[INFO] We having {len(allocation_by_kr_items)} allocation_by_kr_items by query: \n {query_allocation_by_kr}")
-
-                    if len(allocation_by_kr_items) < 0:
-                        print("[WARN] Skip process because allocation_by_kr_items is empty")
+                    lookup_key = (my_from_type, my_to_type, my_by_type)
+                    allocation_by_kr_item = allocation_by_kr_map.get(lookup_key)
+                    
+                    if allocation_by_kr_item is None:
+                        print(f"[WARN] No allocation_by_kr_item found for key {lookup_key}, skipping")
                         continue
-                    allocation_by_kr_item = allocation_by_kr_items[0]
-                    print(
-                        f"[INFO] We have allocation_by_kr_item by picking the first element of allocation_by_kr_items: {allocation_by_kr_item}")
+                    
+                    print(f"[INFO] Found allocation_by_kr_item from map for key {lookup_key}: {allocation_by_kr_item}")
 
                     kr_block_3 = allocation_by_kr_item
 
+                    # Step160: Batch query all by_percent values for all my_to_items
+                    print(f"[INFO][Step 160] Building batch query for {len(my_to_items)} by_percent values")
+                    to_item_values = [item.to_item for item in my_to_items]
+                    
+                    by_percent_batch_query = build_so_cell_by_kr_batch_query(
+                        allocation_by_kr_item=kr_block_3,
+                        to_items=to_item_values,
+                        project_id=project_id,
+                        dataset_id=alloc_data_dataset_name,
+                        table_id=so_cell_table_name
+                    )
+                    
+                    if by_percent_batch_query is None:
+                        print(f"[WARN][Step 160] No valid by_percent query conditions, skipping")
+                        continue
+                    
+                    print(f"[INFO][Step 160] Executing batch by_percent query")
+                    by_percent_result_raw = bq.execute_query(by_percent_batch_query)
+                    all_by_percent_items = SoCell.from_dataframe(by_percent_result_raw)
+                    print(f"[INFO][Step 160] Batch query returned {len(all_by_percent_items)} by_percent items")
+                    
+                    # Group by_percent results by to_item
+                    by_percent_map = group_by_percent_results(all_by_percent_items)
+                    print(f"[INFO][Step 160] Grouped by_percent into {len(by_percent_map)} unique to_items")
+
+                    # Step170: Process each my_to_item using the by_percent map
                     for my_to_item in my_to_items:
-                        print(f"[INFO] Start processing for each my_to_item: {my_to_item}")
+                        print(f"[INFO][Step 170] Start processing for each my_to_item: {my_to_item}")
 
-                        filter_block_3 = my_to_item
-
-                        by_percent_query = build_so_cell_by_kr_query(
-                            allocation_by_kr_item=kr_block_3,
-                            allocation_to_item=filter_block_3,
-                            project_id=project_id,
-                            to_item=my_to_item.to_item,
-                            dataset_id=alloc_data_dataset_name,
-                            table_id=so_cell_table_name
-                        )
-                        by_percent_result_raw = bq.execute_query(by_percent_query)
-                        by_percent_items = SoCell.from_dataframe(by_percent_result_raw)
-                        print(
-                            f"[INFO][Step 170] We having {len(by_percent_items)} by_percent by query: \n {by_percent_query}")
-                        if len(by_percent_items) == 0:
-                            print("[WARN][Step 170] Skip process because by_percent_items is empty")
-                            continue
-                        by_percent = by_percent_items[0].now_value
+                        # Lookup by_percent from map
+                        by_percent = by_percent_map.get(my_to_item.to_item)
+                        
                         if by_percent is None:
+                            print(f"[WARN][Step 170] No by_percent found for to_item {my_to_item.to_item}, skipping")
                             continue
-                        print(
-                            f"[INFO][Step 170] We have by_percent: \n {by_percent} \n by kr_block_3: {kr_block_3} and filter_block_3: {filter_block_3}")
+                        
+                        print(f"[INFO][Step 170] Found by_percent from map: {by_percent} for to_item: {my_to_item.to_item}")
 
                         value_2 = value_1 * by_percent
 
@@ -480,15 +550,25 @@ def run_allocate(
                                 to_alt=my_allocation_alt_item.to_alt
                             )
 
-                            success = bq.insert_row(
-                                dataset_id=alloc_data_dataset_name,
-                                table_id=so_cell_table_name,
-                                row_data=insert_so_cell
-                            )
-                            if success:
-                                print(f"[INFO][Step 230] Successfully inserted SoCell: {insert_so_cell}")
-                            else:
-                                print(f"[ERROR][Step 230] Failed to insert SoCell: {insert_so_cell}")
+                            # Collect record for batch insert
+                            batch_insert_records.append(insert_so_cell)
+                            print(f"[INFO][Step 230] Added SoCell to batch: {insert_so_cell}")
+            
+            # Batch insert all collected records for this my_allocation_alt_item
+            if batch_insert_records:
+                print(f"[INFO][Step 240] Starting batch insert of {len(batch_insert_records)} records for z_number={my_allocation_alt_item.z_number}")
+                success = bq.insert_rows_batch(
+                    dataset_id=alloc_data_dataset_name,
+                    table_id=so_cell_table_name,
+                    rows_data=batch_insert_records
+                )
+                if success:
+                    print(f"[INFO][Step 240] Successfully batch inserted {len(batch_insert_records)} SoCell records")
+                else:
+                    print(f"[ERROR][Step 240] Failed to batch insert {len(batch_insert_records)} SoCell records")
+            else:
+                print(f"[INFO][Step 240] No records to insert for z_number={my_allocation_alt_item.z_number}")
+        
         print("[INFO] ================> DONE")
 
     except Exception as e:

@@ -196,6 +196,156 @@ def group_socell_by_allocation(so_cell_items: List) -> Dict[str, List]:
     return dict(grouped)
 
 
+def build_so_cell_prev_batch_query(from_so_cell_items: List, z_number: int, project_id: str,
+                                     dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
+    """
+    Build batch query cho nhiều prev SoCell lookups sử dụng OR conditions.
+    Query một lần cho tất cả from_so_cell_items thay vì query nhiều lần trong loop.
+    
+    Args:
+        from_so_cell_items: List of SoCell instances (y_block_1 values)
+        z_number: ZNumber từ AllocationALT
+        project_id: Google Cloud Project ID
+        dataset_id: Dataset ID (default: 'alloc_stage')
+        table_id: Table ID (default: 'so_cell_raw_full')
+        
+    Returns:
+        SQL query string với WHERE conditions sử dụng OR cho từng item
+    """
+    if not from_so_cell_items:
+        return None
+    
+    or_conditions = []
+    
+    for y_block_1 in from_so_cell_items:
+        and_conditions = []
+        
+        # Match PrevYBlock với NowYBlock của y_block_1
+        for now_field, prev_field in PREV_YBLOCK_FIELD_MAPPING.items():
+            value = getattr(y_block_1, now_field, None)
+            
+            if value is None:
+                continue
+            if pd.isna(value):
+                continue
+            if isinstance(value, str) and value == '':
+                continue
+            
+            if isinstance(value, str):
+                escaped_value = value.replace("'", "\\'")
+                formatted_value = f"'{escaped_value}'"
+            elif isinstance(value, (int, float)):
+                formatted_value = str(value)
+            else:
+                formatted_value = f"'{str(value)}'"
+            
+            and_conditions.append(f"{prev_field} = {formatted_value}")
+        
+        # Add now_np condition from y_block_1
+        x_period_1 = y_block_1.now_np
+        if x_period_1 is not None and not pd.isna(x_period_1):
+            if isinstance(x_period_1, str):
+                escaped_x_period = x_period_1.replace("'", "\\'")
+                and_conditions.append(f"now_np = '{escaped_x_period}'")
+            else:
+                and_conditions.append(f"now_np = {x_period_1}")
+        
+        if and_conditions:
+            or_conditions.append(f"({' AND '.join(and_conditions)})")
+    
+    if not or_conditions:
+        return None
+    
+    table_name = f"{project_id}.{dataset_id}.{table_id}"
+    query = f"SELECT * FROM `{table_name}`\nWHERE ("
+    query += "\nOR ".join(or_conditions)
+    query += ")"
+    
+    # Add z_number condition
+    if z_number is not None:
+        query += f"\nAND now_zblock2_alt = '{z_number}'"
+    
+    return query
+
+
+def create_prev_socell_key(y_block_1) -> str:
+    """
+    Tạo unique key từ y_block_1 (from_so_cell_item) để match với prev SoCell.
+    Key dựa trên now_y_block fields của y_block_1 và now_np.
+    
+    Args:
+        y_block_1: SoCell instance (from_so_cell_item)
+        
+    Returns:
+        String key dạng "field1:value1|field2:value2|...|now_np:value"
+    """
+    key_parts = []
+    
+    for now_field, prev_field in PREV_YBLOCK_FIELD_MAPPING.items():
+        value = getattr(y_block_1, now_field, None)
+        
+        if value is None or pd.isna(value) or (isinstance(value, str) and value == ''):
+            continue
+        
+        # Use prev_field name in key to match with result
+        key_parts.append(f"{prev_field}:{value}")
+    
+    # Add now_np to key
+    x_period_1 = y_block_1.now_np
+    if x_period_1 is not None and not pd.isna(x_period_1):
+        key_parts.append(f"now_np:{x_period_1}")
+    
+    return "|".join(sorted(key_parts))
+
+
+def create_prev_result_key(prev_so_cell_item) -> str:
+    """
+    Tạo unique key từ prev SoCell result để match với y_block_1.
+    Key dựa trên prev_y_block fields và now_np của result.
+    
+    Args:
+        prev_so_cell_item: SoCell instance từ query result
+        
+    Returns:
+        String key dạng "field1:value1|field2:value2|...|now_np:value"
+    """
+    key_parts = []
+    
+    for now_field, prev_field in PREV_YBLOCK_FIELD_MAPPING.items():
+        value = getattr(prev_so_cell_item, prev_field, None)
+        
+        if value is None or pd.isna(value) or (isinstance(value, str) and value == ''):
+            continue
+        
+        key_parts.append(f"{prev_field}:{value}")
+    
+    # Add now_np to key
+    now_np = prev_so_cell_item.now_np
+    if now_np is not None and not pd.isna(now_np):
+        key_parts.append(f"now_np:{now_np}")
+    
+    return "|".join(sorted(key_parts))
+
+
+def group_prev_socell_by_key(prev_so_cell_items: List) -> Dict[str, List]:
+    """
+    Group prev SoCell items theo key để lookup nhanh.
+    
+    Args:
+        prev_so_cell_items: List of SoCell instances từ batch query
+        
+    Returns:
+        Dictionary mapping key -> list of prev SoCell items
+    """
+    grouped = defaultdict(list)
+    
+    for prev_so_cell_item in prev_so_cell_items:
+        key = create_prev_result_key(prev_so_cell_item)
+        grouped[key].append(prev_so_cell_item)
+    
+    return dict(grouped)
+
+
 def build_so_cell_by_kr_query(allocation_by_kr_item,
                               allocation_to_item,
                               project_id: str,
@@ -292,6 +442,143 @@ def build_so_cell_by_kr_query(allocation_by_kr_item,
         query += "\nWHERE " + "\nAND ".join(where_conditions)
 
     return query
+
+
+def build_so_cell_by_kr_batch_query(allocation_by_kr_item,
+                                     to_items: List,
+                                     project_id: str,
+                                     dataset_id: str = 'alloc_stage',
+                                     table_id: str = 'so_cell_raw_full') -> str:
+    """
+    Build batch query cho SoCell by KR với nhiều to_items sử dụng IN clause.
+    Query một lần cho tất cả to_items thay vì query nhiều lần trong loop.
+    
+    Args:
+        allocation_by_kr_item: Instance của AllocationByKR (kr_block_3)
+        to_items: List of to_item values (my_to_item.to_item)
+        project_id: Google Cloud Project ID
+        dataset_id: Dataset ID (default: 'alloc_stage')
+        table_id: Table ID (default: 'so_cell_raw_full')
+        
+    Returns:
+        SQL query string với WHERE conditions và IN clause cho to_items
+    """
+    if not to_items:
+        return None
+    
+    where_conditions = []
+    
+    kr_to_socell_mapping = {
+        'to_y_block_kr1': 'now_y_block_kr_item_code_kr1',
+        'to_y_block_kr2': 'now_y_block_kr_item_code_kr2',
+        'to_y_block_kr3': 'now_y_block_kr_item_code_kr3',
+        'to_y_block_kr4': 'now_y_block_kr_item_code_kr4',
+        'to_y_block_kr5': 'now_y_block_kr_item_code_kr5',
+        'to_y_block_kr6': 'now_y_block_kr_item_code_kr6',
+        'to_y_block_kr7': 'now_y_block_kr_item_code_kr7',
+        'to_y_block_kr8': 'now_y_block_kr_item_code_kr8',
+        'to_y_block_cdt1': 'now_y_block_cdt_cdt1',
+        'to_y_block_cdt2': 'now_y_block_cdt_cdt2',
+        'to_y_block_cdt3': 'now_y_block_cdt_cdt3',
+        'to_y_block_cdt4': 'now_y_block_cdt_cdt4',
+        'to_y_block_pt1': 'now_y_block_ptnow_pt1',
+        'to_y_block_pt2': 'now_y_block_ptnow_pt2',
+        'to_y_block_duration': 'now_y_block_ptnow_duration',
+        'to_y_block_pt1_prev': 'now_y_block_ptprev_pt1',
+        'to_y_block_pt2_prev': 'now_y_block_ptprev_pt2',
+        'to_y_block_duration_prev': 'now_y_block_ptprev_duration',
+        'to_y_block_own_type': 'now_y_block_ptfix_owntype',
+        'to_y_block_ai_type': 'now_y_block_ptfix_aitype',
+        'to_y_block_cty1': 'now_y_block_ptsub_cty1',
+        'to_y_block_cty2': 'now_y_block_ptsub_cty2',
+        'to_y_block_os_type': 'now_y_block_ptsub_ostype',
+        'to_y_block_fu1': 'now_y_block_funnel_fu1',
+        'to_y_block_fu2': 'now_y_block_funnel_fu2',
+        'to_y_block_ch': 'now_y_block_channel_ch',
+        'to_y_block_egt1': 'now_y_block_employee_egt1',
+        'to_y_block_egt2': 'now_y_block_employee_egt2',
+        'to_y_block_egt3': 'now_y_block_employee_egt3',
+        'to_y_block_egt4': 'now_y_block_employee_egt4',
+        'to_y_block_hr1': 'now_y_block_hr_hr1',
+        'to_y_block_hr2': 'now_y_block_hr_hr2',
+        'to_y_block_hr3': 'now_y_block_hr_hr3',
+        'to_y_block_sec': 'now_y_block_sec',
+        'to_y_block_mx': 'now_y_block_period_mx',
+        'to_y_block_dx': 'now_y_block_period_dx',
+        'to_y_block_ppc': 'now_y_block_period_ppc',
+        'to_y_block_np': 'now_y_block_period_np',
+        'to_y_block_le1': 'now_y_block_le_le1',
+        'to_y_block_le2': 'now_y_block_le_le2',
+        'to_y_block_unit': 'now_y_block_unit',
+    }
+    
+    for kr_field, socell_field in kr_to_socell_mapping.items():
+        value = getattr(allocation_by_kr_item, kr_field, None)
+        
+        if value is None:
+            continue
+        if pd.isna(value):
+            continue
+        if isinstance(value, str) and value == '':
+            continue
+        
+        if isinstance(value, str):
+            escaped_value = value.replace("'", "\\'")
+            formatted_value = f"'{escaped_value}'"
+        elif isinstance(value, (int, float)):
+            formatted_value = str(value)
+        else:
+            formatted_value = f"'{str(value)}'"
+        
+        where_conditions.append(f"{socell_field} = {formatted_value}")
+    
+    # Add IN clause for to_items
+    to_items_escaped = [str(item).replace("'", "\\'") for item in to_items]
+    to_items_in_clause = "', '".join(to_items_escaped)
+    where_conditions.append(f"now_y_block_period_mx IN ('{to_items_in_clause}')")
+    
+    table_name = f"{project_id}.{dataset_id}.{table_id}"
+    query = f"SELECT * FROM `{table_name}`"
+    
+    if where_conditions:
+        query += "\nWHERE " + "\nAND ".join(where_conditions)
+    
+    return query
+
+
+def create_by_percent_key(to_item: str) -> str:
+    """
+    Tạo key từ to_item để lookup by_percent result.
+    
+    Args:
+        to_item: ToItem value
+        
+    Returns:
+        String key (chính là to_item value)
+    """
+    return str(to_item)
+
+
+def group_by_percent_results(by_percent_items: List) -> Dict[str, float]:
+    """
+    Group by_percent results theo now_y_block_period_mx (to_item) để lookup nhanh.
+    
+    Args:
+        by_percent_items: List of SoCell instances từ batch query
+        
+    Returns:
+        Dictionary mapping to_item -> by_percent value (now_value)
+    """
+    grouped = {}
+    
+    for item in by_percent_items:
+        to_item = item.now_y_block_period_mx
+        if to_item and item.now_value is not None:
+            # Take first value if multiple (same logic as original [0])
+            if to_item not in grouped:
+                grouped[to_item] = item.now_value
+    
+    return grouped
 
 
 def build_so_cell_prev_query(y_block_1, x_period_1: str, z_number: int, project_id: str,
