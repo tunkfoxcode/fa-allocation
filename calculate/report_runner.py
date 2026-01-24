@@ -283,10 +283,17 @@ def query_so_cell_data(
             so_cell_field = kr_field_mapping[kr_field]
             where_conditions.append(f"{so_cell_field} = '{kr_value}'")
     
-    for filter_field, filter_value in my_filter_item.items():
-        if filter_field in filter_field_mapping:
-            so_cell_field = filter_field_mapping[filter_field]
-            where_conditions.append(f"{so_cell_field} = '{filter_value}'")
+    # Handle filter fields: if my_filter_item is empty, add IS NULL conditions for all filter fields
+    if not my_filter_item:
+        # Empty filter_item: add IS NULL for all filter fields
+        for filter_field, so_cell_field in filter_field_mapping.items():
+            where_conditions.append(f"{so_cell_field} IS NULL")
+    else:
+        # Has filter values: add equality conditions
+        for filter_field, filter_value in my_filter_item.items():
+            if filter_field in filter_field_mapping:
+                so_cell_field = filter_field_mapping[filter_field]
+                where_conditions.append(f"{so_cell_field} = '{filter_value}'")
     
     where_conditions.append(f"now_np IN ('{periods_str}')")
     where_conditions.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
@@ -310,10 +317,17 @@ def query_so_cell_data(
             so_cell_field = kr_field_mapping[kr_field]
             where_conditions_actual.append(f"{so_cell_field} = '{kr_value}'")
     
-    for filter_field, filter_value in my_filter_item.items():
-        if filter_field in filter_field_mapping:
-            so_cell_field = filter_field_mapping[filter_field]
-            where_conditions_actual.append(f"{so_cell_field} = '{filter_value}'")
+    # Handle filter fields: if my_filter_item is empty, add IS NULL conditions for all filter fields
+    if not my_filter_item:
+        # Empty filter_item: add IS NULL for all filter fields
+        for filter_field, so_cell_field in filter_field_mapping.items():
+            where_conditions_actual.append(f"{so_cell_field} IS NULL")
+    else:
+        # Has filter values: add equality conditions
+        for filter_field, filter_value in my_filter_item.items():
+            if filter_field in filter_field_mapping:
+                so_cell_field = filter_field_mapping[filter_field]
+                where_conditions_actual.append(f"{so_cell_field} = '{filter_value}'")
     
     where_conditions_actual.append(f"now_np IN ('{periods_str}')")
     where_conditions_actual.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
@@ -350,10 +364,17 @@ def query_so_cell_data(
             so_cell_field = kr_field_mapping[kr_field]
             where_conditions_forecast.append(f"{so_cell_field} = '{kr_value}'")
     
-    for filter_field, filter_value in my_filter_item.items():
-        if filter_field in filter_field_mapping:
-            so_cell_field = filter_field_mapping[filter_field]
-            where_conditions_forecast.append(f"{so_cell_field} = '{filter_value}'")
+    # Handle filter fields: if my_filter_item is empty, add IS NULL conditions for all filter fields
+    if not my_filter_item:
+        # Empty filter_item: add IS NULL for all filter fields
+        for filter_field, so_cell_field in filter_field_mapping.items():
+            where_conditions_forecast.append(f"{so_cell_field} IS NULL")
+    else:
+        # Has filter values: add equality conditions
+        for filter_field, filter_value in my_filter_item.items():
+            if filter_field in filter_field_mapping:
+                so_cell_field = filter_field_mapping[filter_field]
+                where_conditions_forecast.append(f"{so_cell_field} = '{filter_value}'")
     
     where_conditions_forecast.append(f"now_np IN ('{periods_str}')")
     where_conditions_forecast.append(f"NOW_ZBlock2_ALT = '{my_alt}'")
