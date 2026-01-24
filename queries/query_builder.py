@@ -1,5 +1,7 @@
 import pandas as pd
 from config.field_mappings import YBLOCK_FIELD_MAPPING, PREV_YBLOCK_FIELD_MAPPING
+from typing import List, Dict
+from collections import defaultdict
 
 
 def build_so_cell_query(allocation_by_type_item, project_id: str, my_x_period: str = None, 
@@ -54,6 +56,144 @@ def build_so_cell_query(allocation_by_type_item, project_id: str, my_x_period: s
         query += "\nWHERE " + "\nAND ".join(where_conditions)
 
     return query
+
+
+def build_so_cell_batch_query(allocation_by_type_items, project_id: str, my_x_period: str = None,
+                               dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
+    """
+    Build batch query cho nhiều AllocationByType items sử dụng OR conditions.
+    Query một lần thay vì query nhiều lần trong loop.
+    
+    Args:
+        allocation_by_type_items: List of AllocationByType instances
+        project_id: Google Cloud Project ID
+        my_x_period: Period value to filter by now_np (optional)
+        dataset_id: Dataset ID (default: 'alloc_stage')
+        table_id: Table ID (default: 'so_cell_raw_full')
+        
+    Returns:
+        SQL query string với WHERE conditions sử dụng OR cho từng item
+    """
+    if not allocation_by_type_items:
+        return None
+    
+    or_conditions = []
+    
+    for allocation_by_type_item in allocation_by_type_items:
+        # Skip GAgg and ByAgg types
+        if hasattr(allocation_by_type_item, 'by_block_by_type'):
+            if allocation_by_type_item.by_block_by_type in ['GAgg', 'ByAgg']:
+                continue
+        
+        and_conditions = []
+        
+        for by_type_field, so_cell_field in YBLOCK_FIELD_MAPPING.items():
+            value = getattr(allocation_by_type_item, by_type_field, None)
+            
+            if value is None:
+                continue
+            if pd.isna(value):
+                continue
+            if isinstance(value, str) and value == '':
+                continue
+            
+            if isinstance(value, str):
+                escaped_value = value.replace("'", "\\'")
+                formatted_value = f"'{escaped_value}'"
+            elif isinstance(value, (int, float)):
+                formatted_value = str(value)
+            else:
+                formatted_value = f"'{str(value)}'"
+            
+            and_conditions.append(f"{so_cell_field} = {formatted_value}")
+        
+        if and_conditions:
+            or_conditions.append(f"({' AND '.join(and_conditions)})")
+    
+    if not or_conditions:
+        return None
+    
+    table_name = f"{project_id}.{dataset_id}.{table_id}"
+    query = f"SELECT * FROM `{table_name}`\nWHERE ("
+    query += "\nOR ".join(or_conditions)
+    query += ")"
+    
+    # Add now_np condition if my_x_period is provided
+    if my_x_period is not None and not pd.isna(my_x_period):
+        if isinstance(my_x_period, str):
+            escaped_period = my_x_period.replace("'", "\\'")
+            query += f"\nAND now_np = '{escaped_period}'"
+        else:
+            query += f"\nAND now_np = {my_x_period}"
+    
+    return query
+
+
+def create_allocation_key(allocation_by_type_item) -> str:
+    """
+    Tạo unique key từ AllocationByType item dựa trên các Y-block fields.
+    Key này dùng để group và lookup SoCell results.
+    
+    Args:
+        allocation_by_type_item: Instance của AllocationByType
+        
+    Returns:
+        String key dạng "field1:value1|field2:value2|..."
+    """
+    key_parts = []
+    
+    for by_type_field, so_cell_field in YBLOCK_FIELD_MAPPING.items():
+        value = getattr(allocation_by_type_item, by_type_field, None)
+        
+        if value is None or pd.isna(value) or (isinstance(value, str) and value == ''):
+            continue
+        
+        key_parts.append(f"{so_cell_field}:{value}")
+    
+    return "|".join(sorted(key_parts))
+
+
+def create_socell_key(so_cell_item) -> str:
+    """
+    Tạo unique key từ SoCell item dựa trên các now_y_block fields.
+    Key này phải match với key từ create_allocation_key.
+    
+    Args:
+        so_cell_item: Instance của SoCell
+        
+    Returns:
+        String key dạng "field1:value1|field2:value2|..."
+    """
+    key_parts = []
+    
+    for by_type_field, so_cell_field in YBLOCK_FIELD_MAPPING.items():
+        value = getattr(so_cell_item, so_cell_field, None)
+        
+        if value is None or pd.isna(value) or (isinstance(value, str) and value == ''):
+            continue
+        
+        key_parts.append(f"{so_cell_field}:{value}")
+    
+    return "|".join(sorted(key_parts))
+
+
+def group_socell_by_allocation(so_cell_items: List) -> Dict[str, List]:
+    """
+    Group SoCell items theo key để lookup nhanh.
+    
+    Args:
+        so_cell_items: List of SoCell instances
+        
+    Returns:
+        Dictionary mapping key -> list of SoCell items
+    """
+    grouped = defaultdict(list)
+    
+    for so_cell_item in so_cell_items:
+        key = create_socell_key(so_cell_item)
+        grouped[key].append(so_cell_item)
+    
+    return dict(grouped)
 
 
 def build_so_cell_by_kr_query(allocation_by_kr_item,

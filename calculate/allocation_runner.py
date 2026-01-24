@@ -2,7 +2,14 @@ import copy
 from db.bigquery_connector import BigQueryConnector
 from models.allocation_models import AllocationALT, AllocationToItem, AllocationByType, AllocationByKR
 from models.so_cell_model import SoCell
-from queries.query_builder import build_so_cell_query, build_so_cell_by_kr_query, build_so_cell_prev_query
+from queries.query_builder import (
+    build_so_cell_query, 
+    build_so_cell_by_kr_query, 
+    build_so_cell_prev_query,
+    build_so_cell_batch_query,
+    create_allocation_key,
+    group_socell_by_allocation
+)
 from utils.period_utils import add_period_strings
 from services.allocation_service import calculate_offset
 from services.so_cell_factory import create_socell_from_yblocks
@@ -309,16 +316,10 @@ def run_allocate(
                 my_allocation_alt_item=my_allocation_alt_item
             )
 
+            # Step60: Process ByAgg types first
             for my_allocation_by_type_item in my_allocation_by_type_items:
-                print(f"[INFO][Step 60] Processing for each my_allocation_by_type_item: {my_allocation_by_type_item}")
-
-                if my_allocation_by_type_item.by_block_by_type == 'GAgg':
-                    print(
-                        "INFO][Step 60] Ignore process for this my_allocation_by_type_item because by type is GAgg or ByAgg")
-                    continue
-
                 if my_allocation_by_type_item.by_block_by_type == 'ByAgg':
-                    # Process ByAgg allocation
+                    print(f"[INFO][Step 60] Processing ByAgg allocation")
                     process_by_agg_allocation(
                         bq=bq,
                         project_id=project_id,
@@ -327,20 +328,46 @@ def run_allocate(
                         alloc_data_dataset_name=alloc_data_dataset_name,
                         so_cell_table_name=so_cell_table_name
                     )
-                    continue
-                #Step70 Query so_cell by my_x_period
-                query_so_cell = build_so_cell_query(
-                    my_allocation_by_type_item,
-                    project_id,
-                    my_x_period=my_x_period,
-                    dataset_id=alloc_data_dataset_name,
-                    table_id=so_cell_table_name
-                )
-                my_so_cell_raw = bq.execute_query(query_so_cell)
 
-                from_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
-                print(
-                    f"[INFO][Step 70] We having {len(from_so_cell_items)} from_so_cell_items by query: \n {query_so_cell}")
+            # Step70: Batch query all SoCell data once (excluding GAgg and ByAgg)
+            print(f"[INFO][Step 70] Building batch query for all allocation_by_type_items")
+            query_so_cell_batch = build_so_cell_batch_query(
+                my_allocation_by_type_items,
+                project_id,
+                my_x_period=my_x_period,
+                dataset_id=alloc_data_dataset_name,
+                table_id=so_cell_table_name
+            )
+            
+            if query_so_cell_batch is None:
+                print(f"[WARN][Step 70] No valid allocation_by_type_items to query, skipping")
+                continue
+            
+            print(f"[INFO][Step 70] Executing batch query: \n{query_so_cell_batch}")
+            my_so_cell_raw = bq.execute_query(query_so_cell_batch)
+            all_so_cell_items = SoCell.from_dataframe(my_so_cell_raw)
+            print(f"[INFO][Step 70] Batch query returned {len(all_so_cell_items)} SoCell items")
+            
+            # Group SoCell items by key for fast lookup
+            so_cell_map = group_socell_by_allocation(all_so_cell_items)
+            print(f"[INFO][Step 70] Grouped into {len(so_cell_map)} unique keys")
+
+            # Step80: Process each allocation_by_type_item using the map
+            for my_allocation_by_type_item in my_allocation_by_type_items:
+                print(f"[INFO][Step 80] Processing my_allocation_by_type_item: {my_allocation_by_type_item}")
+
+                if my_allocation_by_type_item.by_block_by_type == 'GAgg':
+                    print("[INFO][Step 80] Skipping GAgg type")
+                    continue
+
+                if my_allocation_by_type_item.by_block_by_type == 'ByAgg':
+                    print("[INFO][Step 80] Skipping ByAgg type (already processed)")
+                    continue
+                
+                # Lookup SoCell items from map using key
+                allocation_key = create_allocation_key(my_allocation_by_type_item)
+                from_so_cell_items = so_cell_map.get(allocation_key, [])
+                print(f"[INFO][Step 80] Found {len(from_so_cell_items)} SoCell items for key: {allocation_key[:100]}...")
 
                 for from_so_cell_item in from_so_cell_items:
                     print(f"[INFO][Step 80] Start processing for each from_so_cell_item: {from_so_cell_item}")
