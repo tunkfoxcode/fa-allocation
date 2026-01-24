@@ -2,14 +2,15 @@ import pandas as pd
 from config.field_mappings import YBLOCK_FIELD_MAPPING, PREV_YBLOCK_FIELD_MAPPING
 
 
-def build_so_cell_query(allocation_by_type_item, project_id: str, dataset_id: str = 'alloc_stage',
-                        table_id: str = 'so_cell_raw_full') -> str:
+def build_so_cell_query(allocation_by_type_item, project_id: str, my_x_period: str = None, 
+                        dataset_id: str = 'alloc_stage', table_id: str = 'so_cell_raw_full') -> str:
     """
     Build dynamic query cho SoCell dựa trên Y-block fields của AllocationByType
 
     Args:
         allocation_by_type_item: Instance của AllocationByType
         project_id: Google Cloud Project ID
+        my_x_period: Period value to filter by now_np (optional)
         dataset_id: Dataset ID (default: 'alloc_stage')
         table_id: Table ID (default: 'so_cell_raw_full')
 
@@ -37,6 +38,14 @@ def build_so_cell_query(allocation_by_type_item, project_id: str, dataset_id: st
             formatted_value = f"'{str(value)}'"
 
         where_conditions.append(f"{so_cell_field} = {formatted_value}")
+
+    # Add now_np condition if my_x_period is provided
+    if my_x_period is not None and not pd.isna(my_x_period):
+        if isinstance(my_x_period, str):
+            escaped_period = my_x_period.replace("'", "\\'")
+            where_conditions.append(f"now_np = '{escaped_period}'")
+        else:
+            where_conditions.append(f"now_np = {my_x_period}")
 
     table_name = f"{project_id}.{dataset_id}.{table_id}"
     query = f"SELECT * FROM `{table_name}`"
